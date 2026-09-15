@@ -8,9 +8,10 @@ Four views, because the weekly twenty is the output and not the product:
   trends   what the most DJ charts agree on right now, duplicates removed
   fresh    recent releases from the labels he follows
 
-Audio is transcoded to an audio-only WebM/Opus because the artifact asset
-store accepts mp4 and webm but no audio/* type, and the viewer CSP blocks
-media from any external host. An audio-only container satisfies both.
+Audio is transcoded to audio-only WebM/Opus and served from the site
+alongside the page. Opus at 112 kbit keeps the bass a DJ judges a groove
+on, and the container plays in an <audio> element in every current browser
+even though the server labels it video/webm.
 """
 
 import json
@@ -260,6 +261,62 @@ def build_stats(conn):
     return stats
 
 
+def set_metadata(url):
+    """Title, uploader, duration and date, straight from yt-dlp."""
+    try:
+        r = subprocess.run(
+            ["yt-dlp", "--skip-download", "--no-warnings", "--print",
+             "%(title)s\t%(uploader)s\t%(duration)s\t%(upload_date)s", url],
+            capture_output=True, text=True, timeout=120, encoding="utf-8")
+        parts = (r.stdout or "").strip().split("\t")
+        if len(parts) >= 4:
+            return {"title": parts[0], "uploader": parts[1],
+                    "duration": int(parts[2]) if parts[2].isdigit() else None,
+                    "date": parts[3]}
+    except Exception:
+        pass
+    return {}
+
+
+def fetch_thumb(video_id, out_dir):
+    """Save the YouTube thumbnail next to the page.
+
+    Downloaded rather than hotlinked: 30 KB each, and the card then holds
+    together if the video is pulled or YouTube changes its CDN paths.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "%s.jpg" % video_id)
+    if os.path.exists(path):
+        return "thumbs/%s.jpg" % video_id
+    for name in ("maxresdefault", "hqdefault", "mqdefault"):
+        try:
+            req = urllib.request.Request(
+                "https://i.ytimg.com/vi/%s/%s.jpg" % (video_id, name),
+                headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = resp.read()
+            if len(data) > 3000:
+                with open(path, "wb") as fh:
+                    fh.write(data)
+                # maxresdefault arrives around 300 KB and the card shows it
+                # at 152 px. Thumbnails load with the tab while audio waits
+                # to be asked for, so they are the first-paint cost.
+                try:
+                    _ffmpeg(["-i", path, "-vf", "scale=640:-2",
+                             "-q:v", "4", path + ".tmp.jpg"])
+                    if os.path.getsize(path + ".tmp.jpg") > 2000:
+                        os.replace(path + ".tmp.jpg", path)
+                except Exception:
+                    pass
+                finally:
+                    if os.path.exists(path + ".tmp.jpg"):
+                        os.remove(path + ".tmp.jpg")
+                return "thumbs/%s.jpg" % video_id
+        except Exception:
+            continue
+    return None
+
+
 def build_sets(conn):
     rows = conn.execute("""
         SELECT url, artist, title, raw FROM sightings WHERE source = 'setlist'
@@ -288,6 +345,20 @@ def build_sets(conn):
             t["at"] = ("https://youtu.be/%s?t=%d" % (vid, max(0, (t["start"] or 0) - 5))
                        if vid else None)
         entry["count"] = len(entry["tracks"])
+
+        meta = set_metadata(url)
+        if meta.get("title"):
+            entry["name"] = meta["title"]
+        entry["uploader"] = meta.get("uploader")
+        entry["duration"] = meta.get("duration")
+        entry["date"] = meta.get("date")
+        if vid:
+            entry["thumb"] = fetch_thumb(vid, os.path.join(OUT_DIR, "thumbs"))
+        # How much of the set the fingerprinting actually accounted for.
+        if entry["duration"]:
+            covered = sum(max(0, (t["end"] or 0) - (t["start"] or 0)) + 90
+                          for t in entry["tracks"])
+            entry["coverage"] = min(1.0, covered / entry["duration"])
         out.append(entry)
     out.sort(key=lambda e: -e["count"])
     return out

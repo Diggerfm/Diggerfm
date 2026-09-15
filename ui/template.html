@@ -178,16 +178,38 @@ nav .n{
 /* ---------- sets ---------- */
 .setcard{
   border:1px solid var(--line); border-radius:10px; background:var(--surface);
-  padding:16px; margin-top:14px; box-shadow:var(--shadow);
+  margin-top:14px; box-shadow:var(--shadow); overflow:hidden;
 }
+.setcard > summary{
+  display:grid; grid-template-columns:152px 1fr auto; gap:14px;
+  align-items:center; padding:14px; cursor:pointer; list-style:none;
+}
+.setcard > summary::-webkit-details-marker{display:none}
+.setcard > summary:hover{background:var(--sunk)}
+.thumb{
+  aspect-ratio:16/9; border-radius:6px; overflow:hidden;
+  background:var(--sunk); max-width:100%;
+}
+.thumb img{width:100%; height:100%; object-fit:cover; display:block}
 .setcard h3{
   font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:16px;
-  margin:0 0 2px; letter-spacing:-.01em;
+  margin:0 0 3px; letter-spacing:-.01em; text-wrap:balance;
 }
 .setmeta{
   font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted);
-  margin-bottom:12px;
+  font-variant-numeric:tabular-nums; line-height:1.7;
 }
+.chev{
+  color:var(--muted); font-size:18px; line-height:1; transition:transform .18s;
+  padding:0 4px;
+}
+.setcard[open] .chev{transform:rotate(90deg)}
+.setbody{padding:0 14px 14px}
+.cov{
+  display:inline-block; height:4px; width:64px; border-radius:2px;
+  background:var(--sunk); overflow:hidden; vertical-align:middle; margin-left:6px;
+}
+.cov i{display:block; height:100%; background:var(--far); border-radius:2px}
 .tl{display:grid; gap:1px}
 .tl a{
   display:grid; grid-template-columns:58px 1fr auto; gap:10px; align-items:baseline;
@@ -270,6 +292,8 @@ a{color:var(--near)}
 :focus-visible{outline:2px solid var(--near); outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 @media (max-width:520px){
+  .setcard > summary{grid-template-columns:104px 1fr auto; gap:10px; padding:11px}
+  .setcard h3{font-size:14.5px}
   .bd div{min-width:78px}
   .tl a{grid-template-columns:52px 1fr; }
   .tl .conf{display:none}
@@ -347,6 +371,11 @@ a{color:var(--near)}
     return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
     });
+  }
+  function hhmm(sec){
+    sec = Math.max(0, Math.round(sec || 0));
+    var h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
+    return h ? (h + " h " + String(m).padStart(2,"0")) : (m + " min");
   }
   function mmss(sec){
     sec = Math.max(0, Math.round(sec || 0));
@@ -550,11 +579,38 @@ a{color:var(--near)}
       "Chaque set est passe par une reconnaissance audio. Clique un morceau : " +
       "YouTube s'ouvre cinq secondes avant le moment ou il passe, pour entendre le mix " +
       "et pas seulement le titre.</p></div>";
-    D.sets.forEach(function(s){
-      h += '<div class="setcard"><h3>' + esc(s.name || "Set") + "</h3>" +
-        '<div class="setmeta">' + s.count + " morceaux identifies" +
-        (s.video_id ? ' <span class="sep">/</span> <a href="' + esc(s.url) +
-          '" target="_blank" rel="noopener">voir le set</a>' : "") + "</div><div class='tl'>";
+    D.sets.forEach(function(s, i){
+      var meta = [];
+      if(s.uploader) meta.push(esc(s.uploader));
+      if(s.duration) meta.push(hhmm(s.duration));
+      if(s.date && s.date.length === 8){
+        meta.push(s.date.slice(6,8) + "/" + s.date.slice(4,6) + "/" + s.date.slice(0,4));
+      }
+
+      var cov = "";
+      if(s.coverage != null){
+        cov = '<br>' + Math.round(s.coverage*100) + "% du set identifie" +
+          '<span class="cov"><i style="width:' + (s.coverage*100).toFixed(0) + '%"></i></span>';
+      }
+
+      // The first set opens so the view shows what it does at rest; the
+      // rest stay shut so fifteen sets do not become one endless column.
+      h += '<details class="setcard"' + (i === 0 ? " open" : "") + "><summary>" +
+        '<span class="thumb">' +
+          (s.thumb ? '<img src="' + esc(s.thumb) + '" alt="" loading="lazy" width="320" height="180">' : "") +
+        "</span>" +
+        "<span><h3>" + esc(s.name || "Set") + "</h3>" +
+          '<span class="setmeta">' + meta.join(' <span class="sep">/</span> ') +
+          "<br><b>" + s.count + " morceaux identifies</b>" + cov + "</span></span>" +
+        '<span class="chev" aria-hidden="true">&#9656;</span>' +
+        "</summary><div class='setbody'>";
+
+      if(s.url){
+        h += '<div class="setmeta" style="margin-bottom:10px"><a href="' + esc(s.url) +
+          '" target="_blank" rel="noopener">Ouvrir le set sur YouTube</a>' +
+          ' <span class="sep">/</span> chaque ligne ouvre le set 5 s avant le morceau</div>';
+      }
+      h += "<div class='tl'>";
       s.tracks.forEach(function(t){
         var conf = t.probes >= 3 ? "confirme" : (t.probes === 2 ? "probable" : "a verifier");
         h += (t.at ? '<a href="' + esc(t.at) + '" target="_blank" rel="noopener">' : "<a>") +
@@ -562,7 +618,7 @@ a{color:var(--near)}
           '<span class="who">' + esc(t.artist) + " <i>&mdash; " + esc(t.title) + "</i></span>" +
           '<span class="conf">' + conf + "</span></a>";
       });
-      h += "</div></div>";
+      h += "</div></div></details>";
     });
     return h;
   };
