@@ -117,7 +117,11 @@ CREATE TABLE IF NOT EXISTS run_log (
 
 
 def connect(path=None):
-    path = path or DEFAULT_PATH
+    # DIGGER_DB points every caller somewhere else, so a smoke test of a CLI
+    # command cannot land in the real database. Eight invented verdicts once
+    # did, and two real records sat silently excluded from the digest until
+    # someone thought to look at the feedback table.
+    path = path or os.environ.get("DIGGER_DB") or DEFAULT_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
