@@ -70,7 +70,13 @@ def main():
     tmp = tempfile.mkdtemp(prefix="digger_pages_")
     try:
         run(["git", "worktree", "add", "--detach", tmp], quiet=True)
-        run(["git", "checkout", "--orphan", BRANCH], cwd=tmp, quiet=True)
+        # A throwaway branch name, pushed to gh-pages by refspec. Checking
+        # out --orphan gh-pages directly worked once and then failed with
+        # "a branch named gh-pages already exists": the first deploy leaves
+        # the local ref behind, and this runs every week.
+        import time as _t
+        scratch = "_deploy_%d" % int(_t.time())
+        run(["git", "checkout", "--orphan", scratch], cwd=tmp, quiet=True)
         run(["git", "rm", "-rf", "--quiet", "."], cwd=tmp, check=False, quiet=True)
         for name in os.listdir(SITE):
             src = os.path.join(SITE, name)
@@ -84,13 +90,18 @@ def main():
         import datetime
         msg = "site %s" % datetime.date.today().isoformat()
         run(["git", "commit", "-m", msg], cwd=tmp, quiet=True)
-        run(["git", "push", "--force", "origin", BRANCH], cwd=tmp)
+        run(["git", "push", "--force", "origin", "HEAD:refs/heads/" + BRANCH],
+            cwd=tmp)
         print()
         print("pousse sur %s." % BRANCH)
         print("Settings -> Pages -> Deploy from branch -> %s / (root)" % BRANCH)
     finally:
         run(["git", "worktree", "remove", "--force", tmp], check=False, quiet=True)
         shutil.rmtree(tmp, ignore_errors=True)
+        try:
+            run(["git", "branch", "-D", scratch], check=False, quiet=True)
+        except NameError:
+            pass
     return 0
 
 

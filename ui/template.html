@@ -256,6 +256,12 @@ table.tt2 th{
 table.tt2 td{padding:5px 8px 5px 0; border-bottom:1px solid var(--line-soft); font-variant-numeric:tabular-nums}
 table.tt2 td.num{font-family:"IBM Plex Mono",monospace; font-size:11.5px; text-align:right}
 .scroll-x{overflow-x:auto}
+.banner{
+  border:1px solid var(--far); border-left-width:3px; border-radius:8px;
+  background:var(--far-soft); padding:12px 14px; margin-top:16px;
+  font-size:13px; line-height:1.5; max-width:64ch;
+}
+.banner b{color:var(--ink)}
 .empty{
   border:1px dashed var(--line); border-radius:10px; padding:18px;
   color:var(--muted); font-size:13.5px; margin-top:14px; max-width:62ch;
@@ -544,6 +550,18 @@ a{color:var(--near)}
       D.digest.length + " morceaux retenus sur " + (D.counts.works||0).toLocaleString("fr-FR") +
       " reperes. Le quota par case est impose : la liste ne peut pas se replier sur les memes artistes. " +
       rated + " notes sur " + D.digest.length + ".</p>";
+    if(!D.profile){
+      // Said plainly and up front. The ranking currently has nothing of his
+      // in it, and a tool that hides that is worse than one without it.
+      h += '<div class="banner"><b>Tes gouts ne sont pas encore dans la machine.</b> ' +
+        "Ce classement ne tient compte que de ce que les DJs chartent cette semaine " +
+        "et de la repartition imposee entre les cases. Ni ton son, ni tes labels, " +
+        "ni tes heures de set n'y entrent pour l'instant, et la colonne Proximite " +
+        "reste donc vide. " +
+        "<b>Envoie ton export XML Rekordbox</b> et elle se remplit : " +
+        "profil sonore, warm-up / peak / after lus dans les noms de tes playlists, " +
+        "labels a suivre, genres a interroger.</div>";
+    }
     if(rated){
       h += '<p style="margin-top:8px"><button class="ghost" id="exp">Copier mes notes</button> ' +
         '<span class="why" style="display:inline">a coller dans la conversation pour que le ' +
