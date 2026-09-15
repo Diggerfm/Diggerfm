@@ -1,0 +1,22 @@
+# Copy to config.toml and fill in. config.toml is gitignored, never commit it.
+
+[beatport]
+username = ""
+password = ""
+
+[soundcloud]
+# Optional. Left empty, the collector resolves a public client_id instead.
+client_id = ""
+
+[labels]
+# Labels a suivre. Laisse vide et ils seront deduits de sa bibliotheque
+# rekordbox (les plus joues), ce qui vaut mieux qu'une liste devinee.
+follow = []
+since_days = 30
+
+[digest]
+# Imposed quota, see score.SLOT_QUOTA
+bullseye = 10
+modernisation = 5
+bridge = 3
+wildcard = 2

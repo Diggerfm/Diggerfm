@@ -1,0 +1,16 @@
+# Core
+requests>=2.31
+tomli>=2.0 ; python_version < "3.11"
+
+# Audio features (digger/features.py)
+librosa>=0.11
+numpy>=1.26
+
+# Set fingerprinting (digger/fingerprint/)
+yt-dlp>=2026.1
+shazamio>=0.7
+
+# Install into the project venv, not globally: shazamio pulls numpy 2.x,
+# which conflicts with scipy/tensorflow pinned below 2.0 elsewhere.
+#   python -m venv .venv
+#   .venv/Scripts/python -m pip install -r requirements.txt

@@ -1,0 +1,825 @@
+<title>Digger FM</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F1EFEB; --surface:#FFFFFF; --sunk:#E7E4DE;
+  --line:#D8D3CA; --line-soft:#E6E2DA;
+  --ink:#1A1713; --ink-2:#4A443B; --muted:#7D7568;
+  --near:#B96F0A; --far:#1E7478;
+  --near-soft:rgba(185,111,10,.12); --far-soft:rgba(30,116,120,.12);
+  --fire:#C0391B; --keep:#2F7A3E; --meh:#8A7F14; --never:#6B6357;
+  --wave:#C9C3B8; --wave-lit:#B96F0A;
+  --shadow:0 1px 2px rgba(26,23,19,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#12100E; --surface:#1B1815; --sunk:#0C0A09;
+    --line:#302B25; --line-soft:#241F1B;
+    --ink:#EFEAE1; --ink-2:#BDB5A8; --muted:#8B8375;
+    --near:#F2A93B; --far:#52A8AD;
+    --near-soft:rgba(242,169,59,.14); --far-soft:rgba(82,168,173,.14);
+    --fire:#E8623E; --keep:#6FBF7F; --meh:#C9B43C; --never:#8B8375;
+    --wave:#3A342C; --wave-lit:#F2A93B;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#12100E; --surface:#1B1815; --sunk:#0C0A09;
+  --line:#302B25; --line-soft:#241F1B;
+  --ink:#EFEAE1; --ink-2:#BDB5A8; --muted:#8B8375;
+  --near:#F2A93B; --far:#52A8AD;
+  --near-soft:rgba(242,169,59,.14); --far-soft:rgba(82,168,173,.14);
+  --fire:#E8623E; --keep:#6FBF7F; --meh:#C9B43C; --never:#8B8375;
+  --wave:#3A342C; --wave-lit:#F2A93B;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.5; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px; margin:0 auto; padding-inline:18px; padding-block:0 120px}
+
+/* ---------- header ---------- */
+header{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
+  background:color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line-soft);
+}
+.head-in{max-width:860px; margin:0 auto; padding:14px 18px 0}
+.brand{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+h1{
+  font-family:Archivo,system-ui,sans-serif; font-weight:800;
+  font-size:22px; letter-spacing:-.02em; margin:0;
+}
+.stamp{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+  color:var(--muted); letter-spacing:.06em; text-transform:uppercase;
+}
+nav{display:flex; gap:2px; margin-top:12px; overflow-x:auto; scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{
+  appearance:none; background:none; border:0; cursor:pointer;
+  font:inherit; font-weight:500; font-size:13.5px; color:var(--muted);
+  padding:8px 12px 10px; border-bottom:2px solid transparent;
+  white-space:nowrap; transition:color .15s;
+}
+nav button:hover{color:var(--ink-2)}
+nav button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--near)}
+nav .n{
+  font-family:"IBM Plex Mono",monospace; font-size:11px;
+  color:var(--muted); margin-left:5px;
+}
+
+/* ---------- section intro ---------- */
+.intro{padding:22px 0 6px; max-width:62ch}
+.intro h2{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:17px;
+  margin:0 0 4px; letter-spacing:-.01em; text-wrap:balance;
+}
+.intro p{margin:0; color:var(--muted); font-size:13.5px}
+
+/* ---------- slot heading ---------- */
+.slot-head{
+  display:flex; align-items:baseline; gap:10px;
+  margin:26px 0 8px; padding-bottom:6px;
+  border-bottom:1px solid var(--line-soft);
+}
+.slot-name{
+  font-family:Archivo,system-ui,sans-serif; font-weight:800;
+  font-size:12px; letter-spacing:.11em; text-transform:uppercase;
+}
+.slot-note{color:var(--muted); font-size:12.5px}
+.s-near .slot-name{color:var(--near)}
+.s-far .slot-name{color:var(--far)}
+
+/* ---------- track row ---------- */
+.row{
+  display:grid; grid-template-columns:44px 1fr; gap:12px;
+  padding:14px 0; border-bottom:1px solid var(--line-soft);
+  align-items:start;
+}
+.row:last-child{border-bottom:0}
+.play{
+  width:44px; height:44px; border-radius:50%;
+  border:1px solid var(--line); background:var(--surface);
+  color:var(--ink); cursor:pointer; display:grid; place-items:center;
+  padding:0; transition:border-color .15s, background .15s;
+}
+.play:hover{border-color:var(--near)}
+.play[disabled]{opacity:.35; cursor:default}
+.play svg{width:15px; height:15px; fill:currentColor}
+.row.playing .play{border-color:var(--near); background:var(--near-soft); color:var(--near)}
+
+.tt{min-width:0}
+.artist{font-weight:600; font-size:15px; line-height:1.3}
+.name{color:var(--ink-2); font-size:14.5px; line-height:1.3}
+.meta{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px;
+  color:var(--muted); margin-top:5px;
+  display:flex; gap:4px; flex-wrap:wrap; align-items:center;
+  font-variant-numeric:tabular-nums;
+}
+.meta .sep{opacity:.4}
+.cam{color:var(--far); font-weight:600}
+.bpm{color:var(--ink-2); font-weight:600}
+.why{
+  font-size:12.5px; color:var(--muted); margin-top:6px;
+  line-height:1.45; max-width:60ch;
+}
+.why b{color:var(--ink-2); font-weight:600}
+
+/* ---------- waveform ---------- */
+.wf{
+  margin-top:9px; height:26px; width:100%; display:block;
+  cursor:pointer; touch-action:none;
+}
+.wf .bg{fill:var(--wave)}
+.wf .fg{fill:var(--wave-lit)}
+
+/* ---------- rating ---------- */
+.rate{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap}
+.rate button{
+  appearance:none; cursor:pointer; font:inherit; font-size:12px; font-weight:600;
+  padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line); background:var(--surface); color:var(--muted);
+  transition:all .13s;
+}
+.rate button:hover{border-color:var(--ink-2); color:var(--ink-2)}
+.rate button[aria-pressed="true"]{color:var(--surface); border-color:transparent}
+.rate button[data-v="fire"][aria-pressed="true"]{background:var(--fire)}
+.rate button[data-v="keep"][aria-pressed="true"]{background:var(--keep)}
+.rate button[data-v="meh"][aria-pressed="true"]{background:var(--meh)}
+.rate button[data-v="never"][aria-pressed="true"]{background:var(--never)}
+.note{
+  margin-top:8px; width:100%; max-width:52ch; font:inherit; font-size:13px;
+  padding:7px 10px; border-radius:7px; color:var(--ink);
+  border:1px solid var(--line); background:var(--sunk);
+}
+.note::placeholder{color:var(--muted)}
+.note:focus{outline:2px solid var(--near); outline-offset:1px}
+
+/* ---------- score breakdown ---------- */
+.bd{display:flex; gap:14px; margin-top:8px; flex-wrap:wrap}
+.bd div{min-width:96px}
+.bd .k{
+  font-family:"IBM Plex Mono",monospace; font-size:10px;
+  letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+}
+.bar{height:4px; border-radius:2px; background:var(--sunk); margin-top:3px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--near); border-radius:2px}
+.bar.far i{background:var(--far)}
+
+/* ---------- sets ---------- */
+.setcard{
+  border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  padding:16px; margin-top:14px; box-shadow:var(--shadow);
+}
+.setcard h3{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:16px;
+  margin:0 0 2px; letter-spacing:-.01em;
+}
+.setmeta{
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted);
+  margin-bottom:12px;
+}
+.tl{display:grid; gap:1px}
+.tl a{
+  display:grid; grid-template-columns:58px 1fr auto; gap:10px; align-items:baseline;
+  padding:7px 8px; border-radius:6px; text-decoration:none; color:inherit;
+  transition:background .12s;
+}
+.tl a:hover{background:var(--sunk)}
+.tl .t{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--near);
+  font-variant-numeric:tabular-nums; font-weight:500;
+}
+.tl .who{min-width:0; font-size:13.5px}
+.tl .who i{color:var(--muted); font-style:normal}
+.tl .conf{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted);
+  white-space:nowrap;
+}
+
+/* ---------- analysis ---------- */
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; margin-top:14px}
+.panel{
+  border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  padding:15px; box-shadow:var(--shadow);
+}
+.panel h3{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:13px;
+  margin:0 0 10px; letter-spacing:.02em;
+}
+.hbar{display:grid; gap:6px}
+.hbar .r{display:grid; grid-template-columns:1fr 46px; gap:8px; align-items:center; font-size:12.5px}
+.hbar .lbl{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.hbar .v{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted);
+  text-align:right; font-variant-numeric:tabular-nums;
+}
+.hbar .track{height:6px; background:var(--sunk); border-radius:3px; overflow:hidden; grid-column:1/-1; margin-top:-3px}
+.hbar .track i{display:block; height:100%; background:var(--near); border-radius:3px}
+table.tt2{width:100%; border-collapse:collapse; font-size:12.5px}
+table.tt2 th{
+  text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10px;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+  font-weight:500; padding:0 8px 6px 0; border-bottom:1px solid var(--line-soft);
+}
+table.tt2 td{padding:5px 8px 5px 0; border-bottom:1px solid var(--line-soft); font-variant-numeric:tabular-nums}
+table.tt2 td.num{font-family:"IBM Plex Mono",monospace; font-size:11.5px; text-align:right}
+.scroll-x{overflow-x:auto}
+.empty{
+  border:1px dashed var(--line); border-radius:10px; padding:18px;
+  color:var(--muted); font-size:13.5px; margin-top:14px; max-width:62ch;
+}
+.empty b{color:var(--ink-2)}
+
+/* ---------- player bar ---------- */
+#bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  background:color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter:blur(12px); border-top:1px solid var(--line);
+  padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px));
+}
+.bar-in{
+  max-width:860px; margin:0 auto; display:flex; align-items:center; gap:12px;
+}
+.bar-in .tt{flex:1; min-width:0}
+.bar-in .artist{font-size:13.5px}
+.bar-in .name{font-size:12.5px}
+#barprog{height:3px; background:var(--sunk); border-radius:2px; margin-top:7px; max-width:860px; margin-inline:auto}
+#barprog i{display:block; height:100%; background:var(--near); border-radius:2px; width:0}
+.ghost{
+  appearance:none; background:none; border:1px solid var(--line); border-radius:999px;
+  color:var(--muted); font:inherit; font-size:12px; padding:5px 11px; cursor:pointer;
+}
+.ghost:hover{color:var(--ink); border-color:var(--ink-2)}
+
+.kbd{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted);
+  border:1px solid var(--line); border-radius:4px; padding:1px 5px;
+}
+.foot{margin-top:34px; padding-top:16px; border-top:1px solid var(--line-soft); color:var(--muted); font-size:12px}
+a{color:var(--near)}
+:focus-visible{outline:2px solid var(--near); outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+@media (max-width:520px){
+  .bd div{min-width:78px}
+  .tl a{grid-template-columns:52px 1fr; }
+  .tl .conf{display:none}
+}
+</style>
+
+<header>
+  <div class="head-in">
+    <div class="brand">
+      <h1>Digger FM</h1>
+      <span class="stamp" id="stamp"></span>
+    </div>
+    <nav id="nav" role="tablist"></nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <main id="view"></main>
+  <div class="foot" id="foot"></div>
+</div>
+
+<div id="bar" hidden>
+  <div class="bar-in">
+    <button class="play" id="barplay" aria-label="Lecture"></button>
+    <div class="tt">
+      <div class="artist" id="barartist"></div>
+      <div class="name" id="barname"></div>
+    </div>
+    <button class="ghost" id="barstop">Stop</button>
+    <button class="ghost" id="barexport" hidden>Copier mes notes</button>
+  </div>
+  <div id="barprog"><i></i></div>
+</div>
+
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+(function(){
+  "use strict";
+  var D = JSON.parse(document.getElementById("payload").textContent);
+  var view = document.getElementById("view");
+  var nav  = document.getElementById("nav");
+
+  var ICON_PLAY  = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>';
+  var ICON_PAUSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3.2v11H4zM8.8 2.5H12v11H8.8z"/></svg>';
+
+  var SLOTS = {
+    bullseye:      {label:"Dans le mille", note:"exactement ton son", tone:"near"},
+    modernisation: {label:"Modernisation", note:"ce qui se joue aujourd'hui, assez proche pour rentrer dans tes sets", tone:"near"},
+    bridge:        {label:"Passerelle",    note:"pour accrocher la salle avant de l'emmener chez toi", tone:"far"},
+    wildcard:      {label:"Pari",          note:"tu n'y aurais pas pense, ca peut devenir une arme", tone:"far"}
+  };
+  var VERDICTS = [
+    {v:"fire",  t:"Enorme"},
+    {v:"keep",  t:"Je garde"},
+    {v:"meh",   t:"Moyen"},
+    {v:"never", t:"Jamais"}
+  ];
+
+  var TABS = [
+    {id:"digest", label:"Le digest", n:function(){return D.digest.length}},
+    {id:"sets",   label:"Sets",      n:function(){return D.sets.reduce(function(a,s){return a+s.count},0)}},
+    {id:"trends", label:"Tendances", n:function(){return D.trends.length}},
+    {id:"fresh",  label:"Nouveautes",n:function(){return D.fresh.length}},
+    {id:"stats",  label:"Analyse",   n:function(){return null}}
+  ];
+
+  /* ---------- state ---------- */
+  var ratings = {};          // id -> {verdict, why}
+  var dbNs = null;
+  var current = null;        // {id, audio}
+  var audio = new Audio();
+  audio.preload = "none";
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function mmss(sec){
+    sec = Math.max(0, Math.round(sec || 0));
+    return Math.floor(sec/60) + ":" + String(sec%60).padStart(2,"0");
+  }
+
+  /* ---------- persistence ---------- */
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem("crate-ratings");
+      if(raw) ratings = JSON.parse(raw) || {};
+    }catch(e){ /* private window, blocked storage: page still works */ }
+  }
+  function saveLocal(){
+    try{ localStorage.setItem("crate-ratings", JSON.stringify(ratings)); }catch(e){}
+  }
+  function persist(id, rec){
+    saveLocal();
+    if(!dbNs) return;
+    dbNs.doc("ratings/" + id).set({
+      verdict: rec.verdict, why: rec.why || "",
+      artist: rec.artist || "", title: rec.title || "",
+      week: D.week, at: new Date().toISOString()
+    }).catch(function(){ /* keep the local copy; nothing to retry */ });
+  }
+
+  /* ---------- audio ---------- */
+  function stop(){
+    audio.pause();
+    current = null;
+    document.querySelectorAll(".row.playing").forEach(function(r){ r.classList.remove("playing"); });
+    document.querySelectorAll(".play").forEach(function(b){
+      if(!b.disabled && b.id !== "barplay") b.innerHTML = ICON_PLAY;
+    });
+    document.getElementById("bar").hidden = true;
+  }
+  function play(item, row){
+    if(!item.audio) return;
+    if(current && current.id === item.id){
+      if(audio.paused){ audio.play(); } else { audio.pause(); }
+      syncIcons();
+      return;
+    }
+    audio.src = item.audio;
+    audio.currentTime = 0;
+    audio.play().catch(function(){});
+    current = item;
+    document.querySelectorAll(".row.playing").forEach(function(r){ r.classList.remove("playing"); });
+    if(row) row.classList.add("playing");
+    document.getElementById("bar").hidden = false;
+    document.getElementById("barartist").textContent = item.artist;
+    document.getElementById("barname").textContent = item.title;
+    syncIcons();
+  }
+  function syncIcons(){
+    var icon = audio.paused ? ICON_PLAY : ICON_PAUSE;
+    document.getElementById("barplay").innerHTML = icon;
+    document.querySelectorAll(".row.playing .play").forEach(function(b){ b.innerHTML = icon; });
+  }
+  audio.addEventListener("play", syncIcons);
+  audio.addEventListener("pause", syncIcons);
+  audio.addEventListener("ended", stop);
+  audio.addEventListener("timeupdate", function(){
+    var f = audio.duration ? audio.currentTime / audio.duration : 0;
+    var b = document.querySelector("#barprog i");
+    if(b) b.style.width = (f*100).toFixed(1) + "%";
+    if(current){
+      var clip = document.getElementById("clip-" + cssId(current.id));
+      if(clip) clip.setAttribute("width", (f*100).toFixed(2) + "%");
+    }
+  });
+  document.getElementById("barplay").onclick = function(){
+    if(audio.paused) audio.play(); else audio.pause();
+  };
+  document.getElementById("barstop").onclick = stop;
+
+  function cssId(id){ return id.replace(/[^a-z0-9]+/gi, "-"); }
+
+  /* ---------- waveform ---------- */
+  function waveSvg(item){
+    var w = item.wave;
+    if(!w || !w.length) return "";
+    var n = w.length, top = [], bot = [];
+    for(var i=0;i<n;i++){
+      var x = (i/(n-1)*100).toFixed(3);
+      var h = Math.max(3, w[i]) / 2;
+      top.push(x + "," + (50 - h).toFixed(2));
+      bot.push(x + "," + (50 + h).toFixed(2));
+    }
+    var d = "M" + top.join("L") + "L" + bot.reverse().join("L") + "Z";
+    var cid = cssId(item.id);
+    return '<svg class="wf" viewBox="0 0 100 100" preserveAspectRatio="none" data-id="' + esc(item.id) + '" aria-hidden="true">' +
+      '<defs><clipPath id="cp-' + cid + '"><rect id="clip-' + cid + '" x="0" y="0" width="0%" height="100"/></clipPath></defs>' +
+      '<path class="bg" d="' + d + '"/>' +
+      '<g clip-path="url(#cp-' + cid + ')"><path class="fg" d="' + d + '"/></g>' +
+      '</svg>';
+  }
+
+  /* ---------- pieces ---------- */
+  function metaLine(t){
+    var bits = [];
+    if(t.bpm) bits.push('<span class="bpm">' + Math.round(t.bpm) + '</span> BPM');
+    if(t.camelot) bits.push('<span class="cam">' + esc(t.camelot) + '</span>');
+    else if(t.key) bits.push(esc(t.key));
+    if(t.genre) bits.push(esc(t.genre));
+    if(t.label) bits.push(esc(t.label));
+    if(t.charts >= 2) bits.push(t.charts + " charts DJ");
+    return bits.join(' <span class="sep">/</span> ');
+  }
+
+  function breakdown(t){
+    if(t.affinity == null && t.corroboration == null) return "";
+    function one(k, v, cls){
+      // A component with nothing behind it renders as an empty label and
+      // an empty track, which reads as broken rather than as absent.
+      if(v == null) return "";
+      var pct = Math.max(0, Math.min(1, v)) * 100;
+      var val = pct < 1
+        ? '<span class="k" style="opacity:.6">&mdash;</span>'
+        : '<div class="bar ' + (cls||"") + '"><i style="width:' + pct.toFixed(0) + '%"></i></div>';
+      return '<div><div class="k">' + k + "</div>" + val + "</div>";
+    }
+    var out = one("Proximite", t.affinity) + one("Corroboration", t.corroboration, "far");
+    if(!out.trim()) return "";
+    if(t.timbre_sim != null) out += one("Sonorite", t.timbre_sim);
+    return '<div class="bd">' + out + '</div>';
+  }
+
+  function rateBlock(t){
+    var r = ratings[t.id] || {};
+    var btns = VERDICTS.map(function(v){
+      return '<button type="button" data-v="' + v.v + '" data-id="' + esc(t.id) +
+             '" aria-pressed="' + (r.verdict === v.v) + '">' + v.t + '</button>';
+    }).join("");
+    var note = r.verdict
+      ? '<input class="note" id="note-' + cssId(t.id) + '" data-id="' + esc(t.id) +
+        '" placeholder="Pourquoi ? deux mots suffisent" value="' + esc(r.why || "") + '">'
+      : "";
+    return '<div class="rate">' + btns + "</div>" + note;
+  }
+
+  function trackRow(t, opts){
+    opts = opts || {};
+    var has = !!t.audio;
+    return '<div class="row" data-id="' + esc(t.id) + '">' +
+      '<button class="play" data-id="' + esc(t.id) + '"' + (has ? "" : " disabled") +
+        ' aria-label="Ecouter">' + ICON_PLAY + "</button>" +
+      '<div class="tt">' +
+        '<div class="artist">' + esc(t.artist) + "</div>" +
+        '<div class="name">' + esc(t.title) + "</div>" +
+        '<div class="meta">' + metaLine(t) + "</div>" +
+        (opts.reason && t.reason ? '<div class="why">' + esc(t.reason) + "</div>" : "") +
+        waveSvg(t) +
+        (opts.breakdown ? breakdown(t) : "") +
+        (opts.rate ? rateBlock(t) : "") +
+        (t.url ? '<div class="why"><a href="' + esc(t.url) + '" target="_blank" rel="noopener">Ouvrir la fiche</a></div>' : "") +
+      "</div></div>";
+  }
+
+  /* ---------- views ---------- */
+  var VIEWS = {};
+
+  VIEWS.digest = function(){
+    var rated = D.digest.filter(function(t){ return ratings[t.id]; }).length;
+    var h = '<div class="intro"><h2>La selection de la semaine</h2><p>' +
+      D.digest.length + " morceaux retenus sur " + (D.counts.works||0).toLocaleString("fr-FR") +
+      " reperes. Le quota par case est impose : la liste ne peut pas se replier sur les memes artistes. " +
+      rated + " notes sur " + D.digest.length + ".</p>";
+    if(rated){
+      h += '<p style="margin-top:8px"><button class="ghost" id="exp">Copier mes notes</button> ' +
+        '<span class="why" style="display:inline">a coller dans la conversation pour que le ' +
+        "systeme apprenne.</span></p>";
+    }
+    h += "</div>";
+
+    var order = ["bullseye","modernisation","bridge","wildcard"];
+    order.forEach(function(slot){
+      var items = D.digest.filter(function(t){ return t.slot === slot; });
+      if(!items.length) return;
+      var s = SLOTS[slot];
+      h += '<div class="slot-head s-' + s.tone + '"><span class="slot-name">' + s.label +
+           '</span><span class="slot-note">' + s.note + "</span></div>";
+      h += items.map(function(t){
+        return trackRow(t, {reason:true, breakdown:true, rate:true});
+      }).join("");
+    });
+
+    if(!D.digest.some(function(t){ return t.slot === "bullseye"; })){
+      h += '<div class="empty"><b>La case "Dans le mille" est vide.</b> Elle se remplit quand ta ' +
+           "bibliotheque Rekordbox est importee : sans elle, le systeme n'a rien a quoi comparer " +
+           "et refuse de designer un morceau comme etant exactement ton son.</div>";
+    }
+    return h;
+  };
+
+  VIEWS.sets = function(){
+    if(!D.sets.length){
+      return '<div class="empty">Aucun set identifie pour le moment.</div>';
+    }
+    var h = '<div class="intro"><h2>Ce qui a vraiment ete joue</h2><p>' +
+      "Chaque set est passe par une reconnaissance audio. Clique un morceau : " +
+      "YouTube s'ouvre cinq secondes avant le moment ou il passe, pour entendre le mix " +
+      "et pas seulement le titre.</p></div>";
+    D.sets.forEach(function(s){
+      h += '<div class="setcard"><h3>' + esc(s.name || "Set") + "</h3>" +
+        '<div class="setmeta">' + s.count + " morceaux identifies" +
+        (s.video_id ? ' <span class="sep">/</span> <a href="' + esc(s.url) +
+          '" target="_blank" rel="noopener">voir le set</a>' : "") + "</div><div class='tl'>";
+      s.tracks.forEach(function(t){
+        var conf = t.probes >= 3 ? "confirme" : (t.probes === 2 ? "probable" : "a verifier");
+        h += (t.at ? '<a href="' + esc(t.at) + '" target="_blank" rel="noopener">' : "<a>") +
+          '<span class="t">' + mmss(t.start) + "</span>" +
+          '<span class="who">' + esc(t.artist) + " <i>&mdash; " + esc(t.title) + "</i></span>" +
+          '<span class="conf">' + conf + "</span></a>";
+      });
+      h += "</div></div>";
+    });
+    return h;
+  };
+
+  VIEWS.trends = function(){
+    var h = '<div class="intro"><h2>Ce que les DJs poussent en ce moment</h2><p>' +
+      "Classe par nombre de charts DJ distinctes. Les charts qui portent les memes morceaux " +
+      "sont regroupees et comptent pour une seule voix, sinon un label qui fait charter son " +
+      "propre catalogue prend toute la tete du classement.</p></div>";
+    h += D.trends.map(function(t){
+      return trackRow(t, {breakdown:false, rate:false});
+    }).join("");
+    return h;
+  };
+
+  VIEWS.fresh = function(){
+    var h = '<div class="intro"><h2>Sorties recentes</h2><p>' +
+      "Les nouveautes des labels suivis et de Bandcamp, les plus recentes d'abord. " +
+      "Certaines ne sont pas encore sorties.</p></div>";
+    h += D.fresh.map(function(t){
+      var row = trackRow(t, {});
+      return row.replace('<div class="meta">',
+        '<div class="meta">' + (t.date ? esc(String(t.date).slice(0,16)) + ' <span class="sep">/</span> ' : ""));
+    }).join("");
+    return h;
+  };
+
+  VIEWS.stats = function(){
+    var s = D.stats || {};
+    var h = '<div class="intro"><h2>Ce que la machine mesure</h2><p>' +
+      "Les chiffres bruts derriere la selection, y compris ceux qui ne sont pas flatteurs.</p></div>";
+
+    h += '<div class="grid2">';
+
+    if(s.by_source && s.by_source.length){
+      var maxS = Math.max.apply(null, s.by_source.map(function(r){return r.n}));
+      h += '<div class="panel"><h3>Sources</h3><div class="hbar">' +
+        s.by_source.map(function(r){
+          return '<div class="r"><span class="lbl">' + esc(r.source) + '</span>' +
+            '<span class="v">' + r.n + '</span>' +
+            '<span class="track"><i style="width:' + (r.n/maxS*100).toFixed(0) + '%"></i></span></div>';
+        }).join("") + "</div></div>";
+    }
+
+    if(s.by_genre && s.by_genre.length){
+      var maxG = Math.max.apply(null, s.by_genre.map(function(r){return r.n}));
+      h += '<div class="panel"><h3>Genres collectes</h3><div class="hbar">' +
+        s.by_genre.slice(0,12).map(function(r){
+          return '<div class="r"><span class="lbl">' + esc(r.genre) + '</span>' +
+            '<span class="v">' + r.n + '</span>' +
+            '<span class="track"><i style="width:' + (r.n/maxG*100).toFixed(0) + '%"></i></span></div>';
+        }).join("") + "</div></div>";
+    }
+
+    h += "</div>";
+
+    if(s.timbre_by_genre && s.timbre_by_genre.length){
+      h += '<div class="panel" style="margin-top:18px"><h3>Signature sonore par genre</h3>' +
+        '<div class="scroll-x"><table class="tt2"><thead><tr>' +
+        "<th>Genre</th><th>n</th><th>Energie</th><th>Percussif</th><th>Onsets/s</th><th>Brillance</th>" +
+        "</tr></thead><tbody>" +
+        s.timbre_by_genre.map(function(r){
+          return "<tr><td>" + esc(r.genre) + '</td><td class="num">' + r.n +
+            '</td><td class="num">' + (r.energy||0).toFixed(3) +
+            '</td><td class="num">' + (r.percussive||0).toFixed(3) +
+            '</td><td class="num">' + (r.onsets||0).toFixed(2) +
+            '</td><td class="num">' + Math.round(r.brightness||0) + "</td></tr>";
+        }).join("") + "</tbody></table></div>" +
+        '<p class="why" style="margin-top:10px">La techno hypnotique tient une energie haute avec ' +
+        "un ratio percussif bas : elle est portee par une basse tenue, pas par une percussion bavarde. " +
+        "La deep house fait l'inverse. C'est ce que ces mesures servent a distinguer.</p></div>";
+    }
+
+    if(D.weights){
+      h += '<div class="panel" style="margin-top:18px"><h3>Poids des mesures</h3>' +
+        '<div class="hbar">' + Object.keys(D.weights).sort(function(a,b){
+          return D.weights[b]-D.weights[a];
+        }).map(function(k){
+          return '<div class="r"><span class="lbl">' + esc(k) + '</span>' +
+            '<span class="v">' + D.weights[k].toFixed(2) + '</span>' +
+            '<span class="track"><i style="width:' + (D.weights[k]/1.5*100).toFixed(0) + '%"></i></span></div>';
+        }).join("") + "</div>" +
+        '<p class="why" style="margin-top:10px">Mesures sur 124 morceaux de ton territoire contre 96 ' +
+        "temoins negatifs. L'energie est le seul separateur fort, la brillance est indiscernable du " +
+        "bruit. Ces poids seront recalcules sur tes propres verdicts des qu'il y en aura assez.</p></div>";
+    }
+
+    if(!s.profile){
+      h += '<div class="empty"><b>Ton profil n\'est pas encore importe.</b> Tant qu\'il manque, ' +
+        "l'affinite se calcule sur les noms d'artistes et de labels, ce qui est un substitut faible. " +
+        "L'export XML de Rekordbox debloque d'un coup : le profil sonore, la classification " +
+        "warm-up / peak / after, les labels a suivre et les genres a interroger.</div>";
+    } else {
+      var p = s.profile;
+      h += '<div class="panel" style="margin-top:18px"><h3>Ta bibliotheque</h3>' +
+        '<p class="why">' + p.tracks + " morceaux importes.</p>";
+      if(p.functions && p.functions.length){
+        h += '<div class="hbar" style="margin-top:10px">' + p.functions.map(function(r){
+          return '<div class="r"><span class="lbl">' + esc(r.functions) + '</span>' +
+            '<span class="v">' + r.n + "</span></div>";
+        }).join("") + "</div>";
+      }
+      h += "</div>";
+    }
+    return h;
+  };
+
+  /* ---------- routing ---------- */
+  var active = "digest";
+  function renderNav(){
+    nav.innerHTML = TABS.map(function(t){
+      var n = t.n();
+      return '<button role="tab" data-tab="' + t.id + '" aria-selected="' + (t.id===active) + '">' +
+        t.label + (n != null ? '<span class="n">' + n + "</span>" : "") + "</button>";
+    }).join("");
+  }
+  function render(){
+    renderNav();
+    view.innerHTML = VIEWS[active]();
+    syncIcons();
+    if(current){
+      var r = view.querySelector('.row[data-id="' + cssIdEsc(current.id) + '"]');
+      if(r) r.classList.add("playing");
+    }
+  }
+  function cssIdEsc(id){ return id.replace(/"/g, '\\"'); }
+
+  nav.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-tab]");
+    if(!b) return;
+    active = b.dataset.tab;
+    render();
+    window.scrollTo({top:0, behavior:"instant"});
+  });
+
+  /* ---------- interaction ---------- */
+  function findItem(id){
+    var pools = [D.digest, D.trends, D.fresh];
+    for(var i=0;i<pools.length;i++){
+      for(var j=0;j<pools[i].length;j++){
+        if(pools[i][j].id === id) return pools[i][j];
+      }
+    }
+    return null;
+  }
+
+  /* The feedback loop on a static host: no backend, so the page hands him
+     a compact block he pastes back into the conversation. The pipeline
+     reads it with `cli.py feedback --import`. */
+  function exportText(){
+    var lines = ["# notes " + D.week];
+    Object.keys(ratings).forEach(function(id){
+      var r = ratings[id];
+      if(!r || !r.verdict) return;
+      lines.push("  - [" + id + "] " + r.verdict + " | " + (r.why || ""));
+    });
+    return lines.join("\n");
+  }
+  function copyNotes(btn){
+    var txt = exportText();
+    var done = function(){
+      var old = btn.textContent;
+      btn.textContent = "Copie";
+      setTimeout(function(){ btn.textContent = old; }, 1600);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done, function(){ fallback(txt, done); });
+    } else { fallback(txt, done); }
+  }
+  function fallback(txt, done){
+    var ta = document.createElement("textarea");
+    ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); done(); }catch(e){ window.prompt("Copie ce bloc :", txt); }
+    document.body.removeChild(ta);
+  }
+  document.getElementById("barexport").onclick = function(){ copyNotes(this); };
+
+  view.addEventListener("click", function(e){
+    var ex = e.target.closest("#exp");
+    if(ex){ copyNotes(ex); return; }
+    var p = e.target.closest(".play");
+    if(p && !p.disabled){
+      var it = findItem(p.dataset.id);
+      if(it) play(it, p.closest(".row"));
+      return;
+    }
+    var rb = e.target.closest(".rate button");
+    if(rb){
+      var id = rb.dataset.id, v = rb.dataset.v;
+      var it2 = findItem(id) || {};
+      var rec = ratings[id] || {};
+      rec.verdict = (rec.verdict === v) ? null : v;
+      rec.artist = it2.artist; rec.title = it2.title;
+      if(!rec.verdict){ delete ratings[id]; } else { ratings[id] = rec; }
+      persist(id, rec);
+      render();
+      var n = document.getElementById("note-" + cssId(id));
+      if(n) n.focus();
+      return;
+    }
+    var wf = e.target.closest(".wf");
+    if(wf){
+      var it3 = findItem(wf.dataset.id);
+      if(it3 && current && current.id === it3.id && audio.duration){
+        var box = wf.getBoundingClientRect();
+        audio.currentTime = Math.max(0, Math.min(1, (e.clientX - box.left)/box.width)) * audio.duration;
+      } else if(it3){
+        play(it3, wf.closest(".row"));
+      }
+    }
+  });
+
+  view.addEventListener("change", function(e){
+    var n = e.target.closest(".note");
+    if(!n) return;
+    var id = n.dataset.id;
+    if(!ratings[id]) return;
+    ratings[id].why = n.value.trim();
+    persist(id, ratings[id]);
+  });
+
+  document.addEventListener("keydown", function(e){
+    if(e.target.matches("input, textarea")) return;
+    if(e.key === " " && current){ e.preventDefault(); if(audio.paused) audio.play(); else audio.pause(); }
+    if(e.key === "Escape") stop();
+  });
+
+  /* ---------- boot ---------- */
+  document.getElementById("stamp").textContent =
+    "semaine " + D.week + " / " + (D.counts.analysed||0) + " morceaux analyses";
+  document.getElementById("foot").innerHTML =
+    "Genere le " + esc(D.generated) + ". Les notes sont enregistrees au fur et a mesure. " +
+    '<span class="kbd">espace</span> lecture, <span class="kbd">echap</span> stop.';
+
+  loadLocal();
+  render();
+
+  if(window.claude && window.claude.use){
+    window.claude.use("db").then(function(ns){
+      if(!ns) return;
+      dbNs = ns;
+      ns.collection("ratings").onSnapshot(function(snap){
+        var changed = false;
+        (snap.docs || []).forEach(function(d){
+          var v = d.data ? d.data() : d;
+          var id = (d.id || "").toString();
+          if(!id || !v || !v.verdict) return;
+          var cur = ratings[id];
+          if(!cur || cur.verdict !== v.verdict || (cur.why||"") !== (v.why||"")){
+            ratings[id] = {verdict:v.verdict, why:v.why, artist:v.artist, title:v.title};
+            changed = true;
+          }
+        });
+        if(changed){ saveLocal(); render(); }
+      });
+    }).catch(function(){});
+  }
+})();
+</script>

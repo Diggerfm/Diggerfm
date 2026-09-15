@@ -1,0 +1,14 @@
+# Secrets. config.toml carries the Beatport account, and data/ holds the
+# OAuth token it exchanges them for: ignoring data/*.db alone let
+# beatport_token.json through on the first commit.
+config.toml
+data/
+
+# Regenerated every week and published on the gh-pages branch, never here:
+# the audio previews are about 20 MB a run.
+site/
+
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/

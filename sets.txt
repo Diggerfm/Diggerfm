@@ -1,0 +1,6 @@
+# Sets a identifier par empreinte audio, une URL par ligne.
+# YouTube, Mixcloud ou SoundCloud. Les lignes deja traitees sont ignorees.
+# Mets ici les chaines et les DJs qu'il respecte.
+
+https://www.youtube.com/watch?v=iGXpNRSSRz0
+https://www.youtube.com/watch?v=2o7ybWBEZX0

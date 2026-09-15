@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.7.7" Company="AlphaTheta"/>
+  <COLLECTION Entries="7">
+    <TRACK TrackID="1" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
+           AverageBpm="128.00" Tonality="Am" Label="Drumcode" Year="2019"
+           Rating="204" PlayCount="42" DateAdded="2020-03-14"
+           Comments="peak time" Mix="" Remixer=""/>
+    <TRACK TrackID="2" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
+           AverageBpm="128.00" Tonality="Am" Label="Drumcode" Year="2019"
+           Rating="153" PlayCount="3" DateAdded="2020-03-14"
+           Mix="Extended Mix" Remixer=""/>
+    <TRACK TrackID="3" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
+           AverageBpm="130.00" Tonality="Fm" Label="Drumcode" Year="2020"
+           Rating="255" PlayCount="17" DateAdded="2020-08-01"
+           Mix="Remix" Remixer="Dax J"/>
+    <TRACK TrackID="4" Name="Hypnotised" Artist="Am&#233;lie Lens" Genre="Techno"
+           AverageBpm="132.00" Tonality="Gm" Label="Lenske" Year="2018"
+           Rating="102" PlayCount="0" DateAdded="2019-01-05" Mix="" Remixer=""/>
+    <TRACK TrackID="5" Name="Rolling" Artist="Someone &amp; Other" Genre="Tech House"
+           AverageBpm="125.50" Tonality="Cm" Label="Hot Creations" Year="2023"
+           Rating="204" PlayCount="9" DateAdded="2023-06-11" Mix="" Remixer=""/>
+    <TRACK TrackID="7" Name="Orphan" Artist="Nobody" Genre="Techno"
+           AverageBpm="127.00" Tonality="Dm" Label="None" Year="2024"
+           Rating="51" PlayCount="2" DateAdded="2024-02-02" Mix="" Remixer=""/>
+    <TRACK TrackID="6" Name="" Artist="" Genre="" AverageBpm="" Tonality=""/>
+  </COLLECTION>
+  <PLAYLISTS>
+    <NODE Type="0" Name="ROOT" Count="4">
+      <NODE Name="Warm Up 2026" Type="1" KeyType="0" Entries="2">
+        <TRACK Key="4"/>
+        <TRACK Key="5"/>
+      </NODE>
+      <NODE Name="Peak Time" Type="1" KeyType="0" Entries="2">
+        <TRACK Key="1"/>
+        <TRACK Key="3"/>
+      </NODE>
+      <NODE Type="0" Name="Closing" Count="1">
+        <NODE Name="2026" Type="1" KeyType="0" Entries="1">
+          <TRACK Key="3"/>
+        </NODE>
+      </NODE>
+      <NODE Name="Ibiza 2019" Type="1" KeyType="0" Entries="1">
+        <TRACK Key="5"/>
+      </NODE>
+    </NODE>
+  </PLAYLISTS>
+</DJ_PLAYLISTS>
