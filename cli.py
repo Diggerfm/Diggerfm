@@ -94,6 +94,21 @@ def cmd_collect(args):
             print("labels: %d pistes, %d nouvelles" % (len(rows), n))
             total += n
 
+    if args.source in ("enrich", "all"):
+        from digger import config
+        from digger.sources import beatport
+        u, p = config.beatport_credentials()
+        client = beatport.BeatportClient(u, p)
+
+        def on_each(row, track, how):
+            if track:
+                print("  %-4s %-24s %s" % (how, row["artist"][:24], row["title"][:30]))
+
+        r = beatport.enrich_setlist(conn, client, limit=300,
+                                    on_each=on_each if args.verbose else None)
+        print("enrichissement: %d cherches, %d trouves, %d absents de Beatport"
+              % (r["looked_up"], r["found"], r["missed"]))
+
     if args.source in ("bandcamp", "all"):
         rows = bandcamp.collect_tracks(pages=args.pages, slices=("new", "top"),
                                        genre=args.genre, max_releases=args.releases)
@@ -283,11 +298,13 @@ def main():
     sp.set_defaults(func=cmd_profile)
 
     sc = sub.add_parser("collect")
-    sc.add_argument("source", choices=["beatport", "bandcamp", "labels", "all"])
+    sc.add_argument("source",
+                choices=["beatport", "bandcamp", "labels", "enrich", "all"])
     sc.add_argument("--charts", type=int, default=50)
     sc.add_argument("--releases", type=int, default=30)
     sc.add_argument("--pages", type=int, default=1)
     sc.add_argument("--genre", default="electronic")
+    sc.add_argument("-v", "--verbose", action="store_true")
     sc.set_defaults(func=cmd_collect)
 
     sf = sub.add_parser("fingerprint", help="identifier les morceaux d'un set")

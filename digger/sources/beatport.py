@@ -338,3 +338,103 @@ def labels_from_profile(conn, limit=25, min_tracks=2):
         LIMIT ?
     """, (min_tracks, limit)).fetchall()
     return [r["label"] for r in rows]
+
+
+# --- Enrichment ---------------------------------------------------------
+#
+# A fingerprinted set gives an artist and a title and nothing else: no BPM,
+# no key, no label, no preview. Those are the best records in the database,
+# actually played by DJs he follows, and they were the least usable ones.
+#
+# Shazam returns an ISRC on most matches, and Beatport's ?isrc= filter is an
+# exact lookup (unlike ?q=, which ignores the query and returns the same
+# arbitrary rows for anything). So a played track resolves to its catalogue
+# entry, which carries everything the scorer and the page need, plus the
+# link to buy it.
+
+def find_by_isrc(client, isrc):
+    if not isrc:
+        return None
+    data = client.get("/catalog/tracks/", isrc=isrc, per_page=5)
+    results = data.get("results") or []
+    return results[0] if results else None
+
+
+def find_by_name(client, artist, title):
+    """Fallback for tracks Shazam gave no ISRC for.
+
+    Filters on the track name, then checks the artist by hand: Beatport's
+    name filter is loose enough to return other people's records with the
+    same title, and crediting a play to the wrong artist is worse than
+    leaving the row thin.
+    """
+    if not title:
+        return None
+    clean = title.split("(")[0].strip()
+    try:
+        data = client.get("/catalog/tracks/", name=clean, per_page=20)
+    except Exception:
+        return None
+    wanted = {w for w in (artist or "").lower().replace("&", ",").split(",")}
+    wanted = {w.strip() for w in wanted if w.strip()}
+    if not wanted:
+        return None
+    for t in data.get("results") or []:
+        names = {a.get("name", "").lower() for a in (t.get("artists") or [])}
+        if names & wanted:
+            return t
+    return None
+
+
+def enrich_setlist(conn, client, limit=200, on_each=None):
+    """Fill in the blanks on tracks that only fingerprinting knows about."""
+    rows = conn.execute("""
+        SELECT id, artist, title, isrc FROM sightings
+        WHERE source = 'setlist' AND bpm IS NULL
+        ORDER BY isrc IS NULL, id LIMIT ?
+    """, (limit,)).fetchall()
+
+    found = missed = 0
+    for r in rows:
+        track = None
+        how = None
+        try:
+            track = find_by_isrc(client, r["isrc"])
+            how = "isrc" if track else None
+            if not track:
+                track = find_by_name(client, r["artist"], r["title"])
+                how = "nom" if track else None
+        except Exception:
+            track = None
+
+        if not track:
+            missed += 1
+            if on_each:
+                on_each(r, None, None)
+            continue
+
+        key = track.get("key")
+        if isinstance(key, dict):
+            key = key.get("name")
+        genre = track.get("genre")
+        if isinstance(genre, dict):
+            genre = genre.get("name")
+        release = track.get("release") or {}
+        label = None
+        if isinstance(release, dict):
+            label = (release.get("label") or {}).get("name")
+
+        with conn:
+            conn.execute("""
+                UPDATE sightings
+                SET bpm = ?, music_key = ?, genre = ?, label = ?,
+                    url = COALESCE(url, ?), stream_url = COALESCE(stream_url, ?),
+                    isrc = COALESCE(isrc, ?)
+                WHERE id = ?
+            """, (track.get("bpm"), key, genre, label,
+                  "https://www.beatport.com/track/x/%s" % track.get("id"),
+                  track.get("sample_url"), track.get("isrc"), r["id"]))
+        found += 1
+        if on_each:
+            on_each(r, track, how)
+    return {"looked_up": len(rows), "found": found, "missed": missed}

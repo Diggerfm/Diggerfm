@@ -319,7 +319,12 @@ def fetch_thumb(video_id, out_dir):
 
 def build_sets(conn):
     rows = conn.execute("""
-        SELECT url, artist, title, raw FROM sightings WHERE source = 'setlist'
+        SELECT url, work_key, artist, title, raw, bpm, music_key, label,
+               stream_url,
+               (SELECT MAX(s2.url) FROM sightings s2
+                 WHERE s2.work_key = sightings.work_key
+                   AND s2.url LIKE '%beatport%') AS url_shop
+        FROM sightings WHERE source = 'setlist'
     """).fetchall()
     by_url = {}
     for r in rows:
@@ -328,9 +333,14 @@ def build_sets(conn):
                                              "name": raw.get("set"),
                                              "tracks": []})
         entry["tracks"].append({
+            "id": r["work_key"],
             "artist": r["artist"], "title": r["title"],
             "start": raw.get("start"), "end": raw.get("end"),
             "probes": raw.get("probes", 1),
+            "bpm": r["bpm"], "key": r["music_key"],
+            "camelot": camelot(r["music_key"]),
+            "label": r["label"], "shop": r["url_shop"],
+            "stream": r["stream_url"],
         })
     out = []
     for url, entry in by_url.items():
@@ -490,6 +500,10 @@ def main():
     n2 = attach_audio(trends, 30)
     print("audio des nouveautes...")
     n3 = attach_audio(fresh, 25)
+    print("audio des morceaux joues en set...")
+    n4 = 0
+    for st in sets:
+        n4 += attach_audio(st["tracks"], 40)
 
     timbre = score.timbre_profile(conn)
     payload = {
@@ -520,7 +534,7 @@ def main():
     print("ecrit %s (%.0f Ko)" % (path, size / 1024))
     print("  digest %d | sets %d | tendances %d | nouveautes %d"
           % (len(digest), len(sets), len(trends), len(fresh)))
-    print("  audio: %d morceaux transcodes" % (n1 + n2 + n3))
+    print("  audio: %d morceaux transcodes" % (n1 + n2 + n3 + n4))
     return 0
 
 

@@ -115,14 +115,28 @@ def main():
         return "%d nouveaux sets sur %d" % (done, len(urls))
     stage("fingerprint sets", sets, results)
 
-    # 5. Timbre on whatever is new
+    # 5. Resolve what the sets turned up against the catalogue.
+    #    Fingerprinting yields an artist and a title; Beatport's ?isrc=
+    #    filter turns that into BPM, key, label, a preview and a buy link,
+    #    so the records he was actually played become usable.
+    def enrich():
+        from digger import config
+        from digger.sources import beatport
+        u, p = config.beatport_credentials()
+        client = beatport.BeatportClient(u, p)
+        r = beatport.enrich_setlist(conn, client, limit=300)
+        return "%d cherches, %d resolus, %d absents du catalogue" % (
+            r["looked_up"], r["found"], r["missed"])
+    stage("enrichissement des sets", enrich, results)
+
+    # 6. Timbre on whatever is new
     def feats():
         from digger import features
         r = features.analyze_pending(conn, limit=300)
         return "%d analyses, %d echecs" % (r["analyzed"], r["failed"])
     stage("analyse audio", feats, results)
 
-    # 6. The digest itself
+    # 7. The digest itself
     def digest():
         from digger import feedback as fb
         artists, labels_v = score.profile_vectors(conn)

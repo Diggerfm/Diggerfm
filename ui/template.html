@@ -211,12 +211,24 @@ nav .n{
 }
 .cov i{display:block; height:100%; background:var(--far); border-radius:2px}
 .tl{display:grid; gap:1px}
-.tl a{
-  display:grid; grid-template-columns:58px 1fr auto; gap:10px; align-items:baseline;
-  padding:7px 8px; border-radius:6px; text-decoration:none; color:inherit;
+.tl .ln{
+  display:grid; grid-template-columns:30px 54px 1fr auto; gap:9px;
+  align-items:center; padding:5px 8px; border-radius:6px;
   transition:background .12s;
 }
-.tl a:hover{background:var(--sunk)}
+.tl .ln:hover{background:var(--sunk)}
+.tl .ln.playing{background:var(--near-soft)}
+.tl a{text-decoration:none; color:inherit}
+.tl a:hover{text-decoration:underline}
+.miniplay{
+  width:28px; height:28px; border-radius:50%; padding:0;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  cursor:pointer; display:grid; place-items:center;
+}
+.miniplay:hover{border-color:var(--near)}
+.miniplay[disabled]{opacity:.28; cursor:default}
+.miniplay svg{width:10px; height:10px; fill:currentColor}
+.ln.playing .miniplay{border-color:var(--near); background:var(--near-soft); color:var(--near)}
 .tl .t{
   font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--near);
   font-variant-numeric:tabular-nums; font-weight:500;
@@ -262,6 +274,32 @@ table.tt2 td.num{font-family:"IBM Plex Mono",monospace; font-size:11.5px; text-a
   font-size:13px; line-height:1.5; max-width:64ch;
 }
 .banner b{color:var(--ink)}
+/* ---------- method ---------- */
+.method{
+  border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  margin-top:10px; overflow:hidden; box-shadow:var(--shadow);
+}
+.method > summary{
+  cursor:pointer; list-style:none; padding:12px 14px;
+  display:flex; align-items:center; gap:9px;
+}
+.method > summary::-webkit-details-marker{display:none}
+.method > summary:hover{background:var(--sunk)}
+.method .mtitle{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:13.5px;
+}
+.method .msub{color:var(--muted); font-size:12.5px; margin-left:auto; text-align:right}
+.method[open] .chev{transform:rotate(90deg)}
+.mbody{padding:0 14px 14px; font-size:13px; line-height:1.55; max-width:66ch}
+.mbody p{margin:0 0 9px}
+.mbody ol{margin:0 0 9px; padding-left:20px}
+.mbody li{margin-bottom:5px}
+.mbody code{
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+  background:var(--sunk); padding:1px 5px; border-radius:4px;
+}
+.mbody .warn{color:var(--ink-2); border-left:2px solid var(--far); padding-left:10px}
+
 .empty{
   border:1px dashed var(--line); border-radius:10px; padding:18px;
   color:var(--muted); font-size:13.5px; margin-top:14px; max-width:62ch;
@@ -301,7 +339,7 @@ a{color:var(--near)}
   .setcard > summary{grid-template-columns:104px 1fr auto; gap:10px; padding:11px}
   .setcard h3{font-size:14.5px}
   .bd div{min-width:78px}
-  .tl a{grid-template-columns:52px 1fr; }
+  .tl .ln{grid-template-columns:26px 46px 1fr; gap:7px}
   .tl .conf{display:none}
 }
 </style>
@@ -412,8 +450,8 @@ a{color:var(--near)}
   function stop(){
     audio.pause();
     current = null;
-    document.querySelectorAll(".row.playing").forEach(function(r){ r.classList.remove("playing"); });
-    document.querySelectorAll(".play").forEach(function(b){
+    document.querySelectorAll(".playing").forEach(function(r){ r.classList.remove("playing"); });
+    document.querySelectorAll(".play, .miniplay").forEach(function(b){
       if(!b.disabled && b.id !== "barplay") b.innerHTML = ICON_PLAY;
     });
     document.getElementById("bar").hidden = true;
@@ -429,7 +467,7 @@ a{color:var(--near)}
     audio.currentTime = 0;
     audio.play().catch(function(){});
     current = item;
-    document.querySelectorAll(".row.playing").forEach(function(r){ r.classList.remove("playing"); });
+    document.querySelectorAll(".playing").forEach(function(r){ r.classList.remove("playing"); });
     if(row) row.classList.add("playing");
     document.getElementById("bar").hidden = false;
     document.getElementById("barartist").textContent = item.artist;
@@ -439,7 +477,8 @@ a{color:var(--near)}
   function syncIcons(){
     var icon = audio.paused ? ICON_PLAY : ICON_PAUSE;
     document.getElementById("barplay").innerHTML = icon;
-    document.querySelectorAll(".row.playing .play").forEach(function(b){ b.innerHTML = icon; });
+    document.querySelectorAll(".playing .play, .playing .miniplay")
+      .forEach(function(b){ b.innerHTML = icon; });
   }
   audio.addEventListener("play", syncIcons);
   audio.addEventListener("pause", syncIcons);
@@ -631,10 +670,20 @@ a{color:var(--near)}
       h += "<div class='tl'>";
       s.tracks.forEach(function(t){
         var conf = t.probes >= 3 ? "confirme" : (t.probes === 2 ? "probable" : "a verifier");
-        h += (t.at ? '<a href="' + esc(t.at) + '" target="_blank" rel="noopener">' : "<a>") +
-          '<span class="t">' + mmss(t.start) + "</span>" +
-          '<span class="who">' + esc(t.artist) + " <i>&mdash; " + esc(t.title) + "</i></span>" +
-          '<span class="conf">' + conf + "</span></a>";
+        var info = [];
+        if(t.bpm) info.push(Math.round(t.bpm) + " BPM");
+        if(t.camelot) info.push(t.camelot);
+        info.push(conf);
+        h += '<div class="ln" data-id="' + esc(t.id) + '">' +
+          '<button class="miniplay" data-id="' + esc(t.id) + '"' +
+            (t.audio ? "" : " disabled") + ' aria-label="Ecouter un extrait">' +
+            ICON_PLAY + "</button>" +
+          (t.at ? '<a class="t" href="' + esc(t.at) + '" target="_blank" rel="noopener">'
+                : '<span class="t">') +
+            mmss(t.start) + (t.at ? "</a>" : "</span>") +
+          '<span class="who">' + esc(t.artist) + " <i>&mdash; " + esc(t.title) + "</i>" +
+            (t.label ? ' <i style="opacity:.65">[' + esc(t.label) + "]</i>" : "") + "</span>" +
+          '<span class="conf">' + info.join(" / ") + "</span></div>";
       });
       h += "</div></div></details>";
     });
@@ -673,9 +722,83 @@ a{color:var(--near)}
   VIEWS.stats = function(){
     var s = D.stats || {};
     var h = '<div class="intro"><h2>Ce que la machine mesure</h2><p>' +
-      "Les chiffres bruts derriere la selection, y compris ceux qui ne sont pas flatteurs.</p></div>";
+      "D'ou vient chaque onglet, comment il est fabrique, et ce qu'il ne sait pas faire.</p></div>";
 
-    h += '<div class="grid2">';
+    function method(title, sub, body){
+      return '<details class="method"><summary>' +
+        '<span class="chev" aria-hidden="true">&#9656;</span>' +
+        '<span class="mtitle">' + title + "</span>" +
+        '<span class="msub">' + sub + "</span></summary>" +
+        '<div class="mbody">' + body + "</div></details>";
+    }
+
+    h += method("Le digest", D.digest.length + " morceaux",
+      "<ol>" +
+      "<li>Tous les morceaux vus ces 14 derniers jours entrent comme candidats, " +
+        "quelle que soit leur source. Aujourd'hui " + (D.counts.works||0).toLocaleString("fr-FR") + ".</li>" +
+      "<li>On enleve ceux qui sont deja dans ta bibliotheque et ceux que tu as notes <code>jamais</code>.</li>" +
+      "<li>Chaque candidat recoit deux notes. La <b>proximite</b> compare son " +
+        "timbre au centre de gravite sonore de ta bibliotheque, plus ton habitude " +
+        "de jouer cet artiste ou ce label. La <b>corroboration</b> compte combien " +
+        "de DJs differents l'ont charte et dans combien de sets il a ete joue.</li>" +
+      "<li>La repartition entre les cases est <b>imposee</b>, pas deduite : 10 dans " +
+        "le mille, 5 modernisation, 3 passerelle, 2 paris. Un classement pur " +
+        "retomberait chaque semaine sur les memes cinq artistes.</li>" +
+      "</ol>" +
+      "<p class='warn'>Il n'y a jamais de pourcentage global de compatibilite. " +
+      "Un chiffre unique donne une illusion de precision qu'aucune mesure ici " +
+      "ne justifie, donc les composantes sont affichees separement.</p>");
+
+    h += method("Les sets", (D.sets||[]).length + " sets",
+      "<ol>" +
+      "<li>On telecharge l'audio du set et on le decoupe en sondes de 12 secondes, " +
+        "une toutes les 90 secondes.</li>" +
+      "<li>Chaque sonde passe par la reconnaissance Shazam.</li>" +
+      "<li>La ou rien n'est reconnu, on <b>redescend a 30 secondes</b> uniquement " +
+        "dans ces trous. Sur le Boiler Room, cette seconde passe a fait passer " +
+        "le resultat de 14 a 18 morceaux : un trou de 20 minutes que je croyais " +
+        "rempli d'inedits contenait en fait quatre disques sortis.</li>" +
+      "<li>Les sondes consecutives sur le meme morceau sont fusionnees en une " +
+        "seule lecture. La mention <code>confirme</code> veut dire trois sondes " +
+        "ou plus, <code>a verifier</code> une seule.</li>" +
+      "<li>Shazam rend un code ISRC, qu'on cherche ensuite dans le catalogue " +
+        "Beatport pour recuperer BPM, tonalite, label, extrait et lien d'achat.</li>" +
+      "</ol>" +
+      "<p class='warn'>Ce qui n'est jamais sorti reste introuvable : dubs, " +
+      "edits maison, promos. Le taux de couverture affiche sur chaque set dit " +
+      "quelle part a ete identifiee.</p>");
+
+    h += method("Tendances", (D.trends||[]).length + " morceaux",
+      "<p>Beatport publie les charts que les DJs deposent eux-memes. On en lit " +
+      "120 par semaine et on compte, pour chaque morceau, dans combien de charts " +
+      "<b>distinctes</b> il apparait.</p>" +
+      "<p>Le mot distinctes fait tout le travail. Un label a depose cinq charts " +
+      "au meme nom, le meme jour, avec les memes dix morceaux, signees par cinq " +
+      "de ses propres artistes. Sans correctif, ces dix disques prenaient la tete " +
+      "du classement. Les charts qui portent le meme contenu sont donc regroupees " +
+      "et une grappe compte pour une voix.</p>" +
+      "<p class='warn'>Une chart reste une declaration de soutien, pas une preuve " +
+      "de passage. C'est pour ca que les sets pesent plus.</p>");
+
+    h += method("Nouveautes", (D.fresh||[]).length + " sorties",
+      "<p>Les sorties des 120 derniers jours, venant des labels suivis sur " +
+      "Beatport et de la decouverte Bandcamp. Certaines ne sont pas encore " +
+      "sorties et sont marquees <code>a venir</code> : suivre un label permet de " +
+      "voir un disque avant que le premier DJ ne le charte.</p>" +
+      "<p>Deux morceaux maximum par artiste, sinon un EP de cinq titres publie " +
+      "d'un coup prend cinq lignes d'affilee.</p>");
+
+    h += method("L'analyse sonore", (D.counts.analysed||0) + " morceaux",
+      "<p>Chaque extrait est analyse sur cette machine, sans service payant : " +
+      "energie, dynamique, brillance, part de percussion, densite de groove.</p>" +
+      "<p>Le BPM et la tonalite ne sont <b>pas</b> pris de cette analyse mais de " +
+      "Beatport. Verifie sur 12 morceaux, la detection locale de tonalite tombe " +
+      "juste 5 fois sur 12, ce qui est inutilisable pour du mixage harmonique.</p>" +
+      "<p class='warn'>Ces cinq mesures n'ont aucune verite terrain pour etre " +
+      "validees. Elles sont coherentes entre elles, donc comparables d'un morceau " +
+      "a l'autre, mais leur lien avec ton gout reste a prouver par tes retours.</p>");
+
+    h += '<div class="grid2" style="margin-top:20px">';
 
     if(s.by_source && s.by_source.length){
       var maxS = Math.max.apply(null, s.by_source.map(function(r){return r.n}));
@@ -781,6 +904,7 @@ a{color:var(--near)}
   /* ---------- interaction ---------- */
   function findItem(id){
     var pools = [D.digest, D.trends, D.fresh];
+    (D.sets || []).forEach(function(s){ pools.push(s.tracks || []); });
     for(var i=0;i<pools.length;i++){
       for(var j=0;j<pools[i].length;j++){
         if(pools[i][j].id === id) return pools[i][j];
@@ -824,10 +948,10 @@ a{color:var(--near)}
   view.addEventListener("click", function(e){
     var ex = e.target.closest("#exp");
     if(ex){ copyNotes(ex); return; }
-    var p = e.target.closest(".play");
+    var p = e.target.closest(".play, .miniplay");
     if(p && !p.disabled){
       var it = findItem(p.dataset.id);
-      if(it) play(it, p.closest(".row"));
+      if(it) play(it, p.closest(".row, .ln"));
       return;
     }
     var rb = e.target.closest(".rate button");

@@ -54,6 +54,8 @@ def candidates(conn, since_days=14):
                COUNT(DISTINCT source) AS n_sources,
                GROUP_CONCAT(DISTINCT CASE WHEN source = 'beatport'
                     THEN json_extract(raw, '$.chart_id') END) AS chart_ids,
+               COUNT(DISTINCT CASE WHEN source = 'setlist'
+                    THEN url END) AS n_sets,
                COUNT(*)               AS n_sightings,
                MAX(bpm) AS bpm, MAX(music_key) AS music_key, MAX(isrc) AS isrc,
                GROUP_CONCAT(DISTINCT source) AS sources,
@@ -107,8 +109,17 @@ def corroboration(cand):
     """
     charts = cand.get("n_charts") or 0
     chart_score = min(1.0, max(0, charts - 1) / 3.0)
+
+    # A set play outranks a chart entry and used to count for nothing, which
+    # meant a record a DJ he follows actually dropped scored zero unless
+    # somebody had also charted it. A chart is a claim of support and can be
+    # traded for promo; a fingerprinted set is what came out of the speakers.
+    # So one set already carries weight where one chart does not.
+    sets = cand.get("n_sets") or 0
+    set_score = min(1.0, sets * 0.4)
+
     cross = 0.25 if (cand.get("n_sources") or 1) > 1 else 0.0
-    return min(1.0, chart_score + cross)
+    return min(1.0, chart_score + set_score + cross)
 
 
 def score_all(conn, since_days=14):
@@ -189,6 +200,9 @@ def explain(cand, artists, labels, timbre=None, feats=None):
     l = labels.get((cand.get("label") or "").lower(), 0)
     if l:
         bits.append("label que tu joues (%s)" % cand.get("label"))
+    sets = cand.get("n_sets") or 0
+    if sets:
+        bits.insert(0, "joue dans %d set%s" % (sets, "s" if sets > 1 else ""))
     if (cand.get("n_charts") or 0) >= 2:
         raw = cand.get("n_charts_raw") or cand["n_charts"]
         if raw > cand["n_charts"]:
