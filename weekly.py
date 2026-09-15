@@ -131,8 +131,12 @@ def main():
 
     # 6. Timbre on whatever is new
     def feats():
+        # 300 was a permanent backlog, not a cap: a week brings roughly 1500
+        # new tracks from 120 charts, so the queue only ever grew. At about
+        # four seconds each this is the long pole of the run, which is the
+        # right place for it in a Friday-morning background job.
         from digger import features
-        r = features.analyze_pending(conn, limit=300)
+        r = features.analyze_pending(conn, limit=1500)
         return "%d analyses, %d echecs" % (r["analyzed"], r["failed"])
     stage("analyse audio", feats, results)
 

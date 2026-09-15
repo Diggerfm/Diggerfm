@@ -312,11 +312,28 @@ TIMBRE_FIELDS = ("energy", "dynamics", "brightness", "percussive_ratio",
 # re-derived from his own verdicts once feedback exists.
 TIMBRE_WEIGHTS = {
     "energy": 1.50,
-    "onset_rate": 0.86,
-    "dynamics": 0.63,
-    "percussive_ratio": 0.39,
-    "brightness": 0.15,
+    "onset_rate": 0.74,
+    "dynamics": 0.69,
+    "percussive_ratio": 0.27,
+    "brightness": 0.20,
 }
+
+# Re-derived on 2026-09-15 once the analysis backlog cleared, over 702
+# tracks in his territory against 189 controls instead of 124 against 96.
+# The ordering held, which is the part that mattered:
+#
+#     field              d at n=220   d at n=891
+#     energy                   0.99         0.89
+#     onset_rate               0.57         0.44
+#     dynamics                 0.42         0.41
+#     percussive_ratio         0.26         0.16
+#     brightness               0.02         0.12
+#
+# percussive_ratio is the one to distrust. It read 0.55 on a narrow genre
+# set, 0.26 on a broader one and 0.16 on the full population: an effect
+# that shrinks every time the sample grows is sample noise, not a property
+# of the music. It is kept at a low weight rather than removed because his
+# own verdicts, not genre labels, are what should settle it.
 
 MIN_PROFILE_TRACKS = 15   # below this the centroid is noise, so fall back
 
