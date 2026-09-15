@@ -8,6 +8,15 @@ password = ""
 # Optional. Left empty, the collector resolves a public client_id instead.
 client_id = ""
 
+[discogs]
+# A personal access token from discogs.com/settings/developers. Raises the
+# limit from 25 to 60 requests a minute. The consumer key and secret shown
+# next to it are for OAuth on behalf of other users and are not needed.
+token = ""
+# Discogs requires a unique, identifying User-Agent and silently blocks
+# generic ones. Change the URL if you fork this.
+user_agent = "DiggerFM/0.1 +https://diggerfm.github.io/Diggerfm/"
+
 [labels]
 # Labels a suivre. Laisse vide et ils seront deduits de sa bibliotheque
 # rekordbox (les plus joues), ce qui vaut mieux qu'une liste devinee.

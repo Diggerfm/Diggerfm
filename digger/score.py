@@ -22,6 +22,36 @@ SLOT_QUOTA = [
 ]
 
 
+def label_rarity(conn):
+    """How much a shared label is worth, by how common the label is.
+
+    Borrowed from kristopolous/Mutiny, whose weight.py puts it plainly:
+    "High cardinality (common) properties = weak signal. Low cardinality
+    (rare) properties = strong signal. This is fundamentally Bayesian."
+
+    The previous scoring had this backwards. It scored a label match as
+    min(1, plays / 40), so a label he plays constantly scored highest, and
+    Defected, which everybody plays, counted the same as a small label he
+    has quietly bought from for years. Sharing a label with three thousand
+    other records says almost nothing; sharing one with forty says a lot.
+    """
+    sizes = {}
+    for r in conn.execute("""
+        SELECT LOWER(label) AS label, COUNT(DISTINCT work_key) AS n
+        FROM sightings WHERE label IS NOT NULL AND TRIM(label) != ''
+        GROUP BY LOWER(label)
+    """):
+        sizes[r["label"]] = r["n"]
+    if not sizes:
+        return {}
+    rarity = {}
+    for name, n in sizes.items():
+        # 1/log, floored so a one-release label is not infinitely strong.
+        rarity[name] = 1.0 / math.log(max(n, 2) + 1.0)
+    top = max(rarity.values()) or 1.0
+    return {k: v / top for k, v in rarity.items()}
+
+
 def profile_vectors(conn):
     """Artists and labels he plays, weighted by play count."""
     artists, labels = {}, {}
@@ -76,7 +106,7 @@ def candidates(conn, since_days=14):
     return out
 
 
-def affinity(cand, artists, labels, timbre=None, feats=None):
+def affinity(cand, artists, labels, timbre=None, feats=None, rarity=None):
     """How close this candidate sits to what he already plays, 0 to 1.
 
     Timbre leads when it is available on both sides, because it measures the
@@ -86,9 +116,11 @@ def affinity(cand, artists, labels, timbre=None, feats=None):
     download.
     """
     a = artists.get((cand.get("artist") or "").lower(), 0)
-    l = labels.get((cand.get("label") or "").lower(), 0)
+    name = (cand.get("label") or "").lower()
+    l = labels.get(name, 0)
     artist_score = min(1.0, a / 20.0)
-    label_score = min(1.0, l / 40.0)
+    # Scaled by how rare the label is, not by how much of it he owns.
+    label_score = min(1.0, l / 10.0) * (rarity or {}).get(name, 0.5)
     name_score = 0.75 * artist_score + 0.25 * label_score
 
     sound_score = timbre_similarity(feats, timbre) if (timbre and feats) else None
@@ -129,6 +161,7 @@ def score_all(conn, since_days=14):
 
     timbre = timbre_profile(conn)
     cand_feats = load_candidate_features(conn)
+    rarity = label_rarity(conn)
     # Charts that carry the same records are one opinion, not several.
     # Without this a label charting its own catalogue five times put ten of
     # its releases at the top of the ranking. See digger/charts.py.
@@ -143,7 +176,8 @@ def score_all(conn, since_days=14):
         c["n_charts"] = len({groups.get(i, i) for i in ids})
         feats = cand_feats.get(c["work_key"])
         c["has_timbre"] = bool(timbre and feats)
-        c["affinity"] = affinity(c, artists, labels, timbre=timbre, feats=feats)
+        c["affinity"] = affinity(c, artists, labels, timbre=timbre, feats=feats,
+                                 rarity=rarity)
         c["corroboration"] = corroboration(c)
         c["score"] = 0.6 * c["affinity"] + 0.4 * c["corroboration"]
         scored.append(c)

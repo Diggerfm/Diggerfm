@@ -26,3 +26,13 @@ def beatport_credentials(cfg=None):
     if not bp.get("username") or not bp.get("password"):
         raise ValueError("beatport.username / beatport.password not set in config.toml")
     return bp["username"], bp["password"]
+
+
+def discogs_credentials(cfg=None):
+    """Token and User-Agent. The token is optional: without it the API still
+    answers, at 25 requests a minute instead of 60."""
+    cfg = cfg or load()
+    d = cfg.get("discogs", {})
+    return (d.get("token") or None,
+            d.get("user_agent")
+            or "DiggerFM/0.1 +https://diggerfm.github.io/Diggerfm/")
