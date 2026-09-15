@@ -106,7 +106,8 @@ def candidates(conn, since_days=14):
     return out
 
 
-def affinity(cand, artists, labels, timbre=None, feats=None, rarity=None):
+def affinity(cand, artists, labels, timbre=None, feats=None, rarity=None,
+             rejected=None):
     """How close this candidate sits to what he already plays, 0 to 1.
 
     Timbre leads when it is available on both sides, because it measures the
@@ -126,7 +127,18 @@ def affinity(cand, artists, labels, timbre=None, feats=None, rarity=None):
     sound_score = timbre_similarity(feats, timbre) if (timbre and feats) else None
     if sound_score is None:
         return name_score
-    return round(0.65 * sound_score + 0.35 * name_score, 4)
+
+    blended = 0.65 * sound_score + 0.35 * name_score
+
+    # Distance from what he has turned down, subtracted rather than ignored.
+    # Capped at half: a record can resemble his rejects on these five
+    # measures and still be one he wants, so this discourages and never
+    # vetoes.
+    if rejected and feats:
+        away = timbre_similarity(feats, rejected)
+        if away is not None:
+            blended -= 0.5 * away
+    return round(max(0.0, min(1.0, blended)), 4)
 
 
 def corroboration(cand):
@@ -162,6 +174,7 @@ def score_all(conn, since_days=14):
     timbre = timbre_profile(conn)
     cand_feats = load_candidate_features(conn)
     rarity = label_rarity(conn)
+    rejected_sound = rejected_profile(conn)
     # Charts that carry the same records are one opinion, not several.
     # Without this a label charting its own catalogue five times put ten of
     # its releases at the top of the ranking. See digger/charts.py.
@@ -177,7 +190,7 @@ def score_all(conn, since_days=14):
         feats = cand_feats.get(c["work_key"])
         c["has_timbre"] = bool(timbre and feats)
         c["affinity"] = affinity(c, artists, labels, timbre=timbre, feats=feats,
-                                 rarity=rarity)
+                                 rarity=rarity, rejected=rejected_sound)
         c["corroboration"] = corroboration(c)
         c["score"] = 0.6 * c["affinity"] + 0.4 * c["corroboration"]
         scored.append(c)
@@ -335,6 +348,40 @@ def timbre_profile(conn, min_plays=1):
         var = sum(w * (v - mean) ** 2 for v, w in zip(values, weights)) / total
         std = var ** 0.5
         # A degenerate spread would make every candidate infinitely far away.
+        profile[field] = (mean, std if std > 1e-9 else abs(mean) * 0.25 + 1e-6)
+    return profile
+
+
+def rejected_profile(conn, min_rejected=8):
+    """The sound he has turned down, as its own centre of gravity.
+
+    Until now a "jamais" only removed that one record. Five rejections that
+    share a signature said nothing about the sixth. Borrowed from
+    kristopolous/Mutiny, whose pipeline.py carries positive and negative
+    preferences side by side rather than using the negative ones only as a
+    filter.
+
+    Returns None below min_rejected: a centroid fitted on three opinions
+    would push good records away for no reason.
+    """
+    rows = conn.execute("""
+        SELECT f.energy, f.dynamics, f.brightness, f.percussive_ratio,
+               f.onset_rate, 1 AS w
+        FROM feedback fb
+        JOIN audio_features f ON f.work_key = fb.work_key
+        WHERE fb.verdict = 'never' AND f.error IS NULL
+        GROUP BY fb.work_key
+    """).fetchall()
+    rows = [r for r in rows if all(r[f] is not None for f in TIMBRE_FIELDS)]
+    if len(rows) < min_rejected:
+        return None
+
+    profile = {"n": len(rows)}
+    for field in TIMBRE_FIELDS:
+        values = [r[field] for r in rows]
+        mean = sum(values) / len(values)
+        var = sum((v - mean) ** 2 for v in values) / len(values)
+        std = var ** 0.5
         profile[field] = (mean, std if std > 1e-9 else abs(mean) * 0.25 + 1e-6)
     return profile
 

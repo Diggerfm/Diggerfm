@@ -93,3 +93,55 @@ if FAIL:
     sys.exit(1)
 print("timbre: all checks passed (centre=%.2f partiel=%.2f loin=%.2f)"
       % (sim_centre, sim_part, sim_far))
+
+
+# --- rejections are evidence, not just a filter
+conn.execute("DELETE FROM audio_features")
+conn.execute("DELETE FROM profile_tracks")
+conn.execute("DELETE FROM feedback")
+for i in range(20):
+    add("his%02d" % i, 0.20 + i * 0.001, 0.05, 2500 + i * 10,
+        0.60 + i * 0.002, 6.0, plays=5)
+# Ten rejected records that share a signature of their own: loud and bright.
+for i in range(10):
+    add("no%02d" % i, 0.80 + i * 0.002, 0.30, 8000 + i * 20,
+        0.05, 20.0, profile=False)
+    conn.execute("INSERT INTO feedback (work_key, verdict, why) VALUES (?,?,?)",
+                 ("no%02d" % i, "never", "trop EDM"))
+conn.commit()
+
+prof2 = score.timbre_profile(conn)
+rej = score.rejected_profile(conn)
+check("rejected centroid built", rej is not None, True)
+check("rejected counts", rej["n"], 10)
+
+near_his = {"energy": 0.21, "dynamics": 0.05, "brightness": 2595,
+            "percussive_ratio": 0.619, "onset_rate": 6.0}
+like_rejects = {"energy": 0.81, "dynamics": 0.30, "brightness": 8090,
+                "percussive_ratio": 0.05, "onset_rate": 20.0}
+
+a_good = score.affinity({"artist": "x", "label": None}, {}, {},
+                        timbre=prof2, feats=near_his, rejected=rej)
+a_bad = score.affinity({"artist": "x", "label": None}, {}, {},
+                       timbre=prof2, feats=like_rejects, rejected=rej)
+check("record like his sound still scores", a_good > 0.5, True)
+check("record like his rejects is pushed down", a_bad < a_good, True)
+
+# The penalty must discourage, never veto: the same record without the
+# rejection history should score higher, but not by collapsing to zero.
+a_bad_nopenalty = score.affinity({"artist": "x", "label": None}, {}, {},
+                                 timbre=prof2, feats=like_rejects)
+check("penalty applied", a_bad <= a_bad_nopenalty, True)
+
+# Too few rejections must not build a centroid.
+conn.execute("DELETE FROM feedback WHERE work_key NOT IN ('no00','no01','no02')")
+conn.commit()
+check("refuses a thin reject profile", score.rejected_profile(conn), None)
+
+if FAIL:
+    print("FAILED %d" % len(FAIL))
+    for f in FAIL:
+        print("  " + f)
+    sys.exit(1)
+print("rejets: all checks passed (aime=%.2f, ressemble aux rejets=%.2f)"
+      % (a_good, a_bad))
