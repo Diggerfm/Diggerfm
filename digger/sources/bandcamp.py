@@ -9,7 +9,7 @@ Every item carries a featured_track stream URL, which is what makes local
 audio analysis possible later without buying anything.
 """
 
-from ..normalize import track_key, work_key, normalize_version
+from ..normalize import iso_date, normalize_version, track_key, work_key
 from .base import request
 
 DISCOVER_URL = "https://bandcamp.com/api/discover/3/get_web"
@@ -78,7 +78,7 @@ def to_sighting(item):
         "genre": item.get("genre_text"),
         "label": None,
         "location": item.get("location_text"),
-        "published_at": item.get("publish_date"),
+        "published_at": iso_date(item.get("publish_date")),
         "raw": item,
     }
 
@@ -166,7 +166,7 @@ def tracks_from_release(item, tralbum, tags):
             "genre": item.get("genre_text"),
             "label": None,
             "location": item.get("location_text"),
-            "published_at": item.get("publish_date"),
+            "published_at": iso_date(item.get("publish_date")),
             "raw": {"tags": tags, "duration": t.get("duration"),
                     "release": item.get("primary_text")},
         })

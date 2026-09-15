@@ -163,7 +163,7 @@ class BeatportClient:
 # readable directly. Chart tracks also carry ISRC, BPM and key, which no
 # other source gives us for free.
 
-from ..normalize import normalize_version, track_key, work_key
+from ..normalize import iso_date, normalize_version, track_key, work_key
 
 
 def _chart_track_to_sighting(t, chart):
@@ -206,7 +206,7 @@ def _chart_track_to_sighting(t, chart):
         "genre": genre,
         "label": label,
         "location": None,
-        "published_at": t.get("new_release_date") or t.get("publish_date"),
+        "published_at": iso_date(t.get("new_release_date") or t.get("publish_date")),
         "isrc": t.get("isrc"),
         "bpm": t.get("bpm"),
         "music_key": key,

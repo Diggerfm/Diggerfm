@@ -391,23 +391,51 @@ def build_trends(conn, limit=50):
     return scored[:limit]
 
 
+FRESH_WINDOW_DAYS = 120
+FRESH_PER_ARTIST = 2
+
+
 def build_fresh(conn, limit=50):
+    """Recent releases, newest first and actually sorted by date.
+
+    Dates are ISO in the database now; they were not, and a text sort over
+    Bandcamp's "31 Jul 2026 08:28:51 GMT" ordered by day-of-month, which
+    put a 2011 record above a 2026 one. See normalize.iso_date.
+
+    Capped per artist because a five-track EP published in one go would
+    otherwise take five consecutive rows and push out four other releases.
+    """
+    import datetime
+
+    cutoff = (datetime.date.today()
+              - datetime.timedelta(days=FRESH_WINDOW_DAYS)).isoformat()
     rows = conn.execute("""
         SELECT work_key, MIN(artist) artist, MIN(title) title, MAX(label) label,
                MAX(published_at) published_at, MAX(bpm) bpm,
                MAX(music_key) music_key, MAX(genre) genre, MAX(url) url,
                MAX(stream_url) stream_url, GROUP_CONCAT(DISTINCT source) sources
         FROM sightings
-        WHERE source IN ('label', 'bandcamp') AND published_at IS NOT NULL
-        GROUP BY work_key ORDER BY published_at DESC LIMIT ?
-    """, (limit,)).fetchall()
-    return [{
-        "id": r["work_key"], "artist": r["artist"], "title": r["title"],
-        "label": r["label"], "date": r["published_at"], "bpm": r["bpm"],
-        "key": r["music_key"], "camelot": camelot(r["music_key"]),
-        "genre": r["genre"], "url": r["url"], "stream": r["stream_url"],
-        "sources": (r["sources"] or "").split(","),
-    } for r in rows]
+        WHERE source IN ('label', 'bandcamp') AND published_at >= ?
+        GROUP BY work_key ORDER BY published_at DESC
+    """, (cutoff,)).fetchall()
+
+    seen = {}
+    out = []
+    for r in rows:
+        who = (r["artist"] or "").lower()
+        if seen.get(who, 0) >= FRESH_PER_ARTIST:
+            continue
+        seen[who] = seen.get(who, 0) + 1
+        out.append({
+            "id": r["work_key"], "artist": r["artist"], "title": r["title"],
+            "label": r["label"], "date": r["published_at"], "bpm": r["bpm"],
+            "key": r["music_key"], "camelot": camelot(r["music_key"]),
+            "genre": r["genre"], "url": r["url"], "stream": r["stream_url"],
+            "sources": (r["sources"] or "").split(","),
+        })
+        if len(out) >= limit:
+            break
+    return out
 
 
 def attach_audio(items, max_items):
@@ -460,6 +488,8 @@ def main():
     n1 = attach_audio(digest, 20)
     print("audio des tendances...")
     n2 = attach_audio(trends, 30)
+    print("audio des nouveautes...")
+    n3 = attach_audio(fresh, 25)
 
     timbre = score.timbre_profile(conn)
     payload = {
@@ -490,7 +520,7 @@ def main():
     print("ecrit %s (%.0f Ko)" % (path, size / 1024))
     print("  digest %d | sets %d | tendances %d | nouveautes %d"
           % (len(digest), len(sets), len(trends), len(fresh)))
-    print("  audio: %d morceaux transcodes" % (n1 + n2))
+    print("  audio: %d morceaux transcodes" % (n1 + n2 + n3))
     return 0
 
 

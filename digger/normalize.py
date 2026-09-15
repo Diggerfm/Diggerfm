@@ -105,3 +105,33 @@ def parse_combined(text):
             left, right = text.split(dash, 1)
             return left.strip(), right.strip()
     return "", text.strip()
+
+
+def iso_date(value):
+    """Normalize a publication date to ISO 8601, or None.
+
+    Sources disagree: Beatport sends "2026-09-18", Bandcamp sends
+    "31 Jul 2026 08:28:51 GMT". Stored side by side and ordered as text,
+    the Bandcamp form sorts by day-of-month, so "newest first" listed the
+    31st of any month above the 29th of any other and put a 2011 release
+    above a 2026 one. Everything is stored ISO so a string sort is a date
+    sort.
+    """
+    if not value:
+        return None
+    text = str(value).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}", text):
+        return text[:19]
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(text).strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        pass
+    for fmt in ("%d %b %Y %H:%M:%S %Z", "%d %b %Y %H:%M:%S",
+                "%d %b %Y", "%Y%m%d"):
+        try:
+            import datetime
+            return datetime.datetime.strptime(text, fmt).strftime("%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            continue
+    return None
