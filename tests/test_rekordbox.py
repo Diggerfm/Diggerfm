@@ -66,3 +66,50 @@ if FAIL:
     sys.exit(1)
 print("rekordbox: all checks passed (%d tracks, %d plays)" % (
     summary["tracks"], summary["total_plays"]))
+
+
+# --- the five fields the official XML spec documents and the first parser
+#     ignored, plus the cues he named himself
+rows2 = list(rekordbox.parse(FIXTURE))
+plain2 = [r for r in rows2 if r["title"] == "Your Mind"][0]
+ext2 = [r for r in rows2 if r["title"] == "Your Mind (Extended Mix)"][0]
+hyp = [r for r in rows2 if r["title"] == "Hypnotised"][0]
+
+check("colour read", plain2["colour"], "0xFF0000")
+check("last played read", plain2["last_played"], "2026-08-30")
+check("composer read", plain2["composer"], "Adam Beyer")
+check("grouping read", plain2["grouping"], "weapons")
+check("duration read", plain2["duration"], 412.0)
+check("absent colour stays none", [r for r in rows2 if r["title"] == "Rolling"][0]["colour"], None)
+check("composer on another track", hyp["composer"], "Amelie Lens")
+
+# Only named cues are kept, and they come back in playing order.
+check("named cues only", [c["name"] for c in plain2["cues"]], ["intro", "drop", "break"])
+check("cue position kept", plain2["cues"][1]["start"], 96.2)
+check("memory cue kept", plain2["cues"][2]["num"], -1)
+check("track without cues", hyp["cues"], [])
+
+# Merging the original with its extended edit must keep the LATER play date,
+# where date_added keeps the earlier one.
+merged2 = {r["track_key"]: r for r in rekordbox.merge_versions(rows2)}
+same = merged2[plain2["track_key"]]
+check("merge keeps latest play", same["last_played"], "2026-09-10")
+check("merge keeps earliest add", same["date_added"], "2020-03-14")
+check("merge keeps the richer cues", len(same["cues"]), 3)
+
+# Round trip through the database.
+conn.execute("DELETE FROM profile_tracks")
+rekordbox.load_into(conn, FIXTURE)
+row2 = conn.execute(
+    "SELECT colour, last_played, composer, grouping, duration, cues "
+    "FROM profile_tracks WHERE title = 'Your Mind'").fetchone()
+check("colour stored", row2["colour"], "0xFF0000")
+check("composer stored", row2["composer"], "Adam Beyer")
+check("cues stored as json", "drop" in (row2["cues"] or ""), True)
+
+if FAIL:
+    print("FAILED %d" % len(FAIL))
+    for f in FAIL:
+        print("  " + f)
+    sys.exit(1)
+print("champs de la spec: all checks passed")

@@ -5,10 +5,18 @@
     <TRACK TrackID="1" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
            AverageBpm="128.00" Tonality="Am" Label="Drumcode" Year="2019"
            Rating="204" PlayCount="42" DateAdded="2020-03-14"
-           Comments="peak time" Mix="" Remixer=""/>
+           LastPlayed="2026-08-30" Colour="0xFF0000" Composer="Adam Beyer"
+           Grouping="weapons" TotalTime="412"
+           Comments="peak time" Mix="" Remixer="">
+      <POSITION_MARK Name="intro" Type="0" Start="0.5" Num="0"/>
+      <POSITION_MARK Name="drop" Type="0" Start="96.2" Num="1"/>
+      <POSITION_MARK Name="" Type="0" Start="180.0" Num="2"/>
+      <POSITION_MARK Name="break" Type="0" Start="240.7" Num="-1"/>
+    </TRACK>
     <TRACK TrackID="2" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
            AverageBpm="128.00" Tonality="Am" Label="Drumcode" Year="2019"
            Rating="153" PlayCount="3" DateAdded="2020-03-14"
+           LastPlayed="2026-09-10" Colour="0xFF0000" TotalTime="520"
            Mix="Extended Mix" Remixer=""/>
     <TRACK TrackID="3" Name="Your Mind" Artist="Adam Beyer" Genre="Techno"
            AverageBpm="130.00" Tonality="Fm" Label="Drumcode" Year="2020"
@@ -16,7 +24,8 @@
            Mix="Remix" Remixer="Dax J"/>
     <TRACK TrackID="4" Name="Hypnotised" Artist="Am&#233;lie Lens" Genre="Techno"
            AverageBpm="132.00" Tonality="Gm" Label="Lenske" Year="2018"
-           Rating="102" PlayCount="0" DateAdded="2019-01-05" Mix="" Remixer=""/>
+           Rating="102" PlayCount="0" DateAdded="2019-01-05"
+           Colour="0x00FF00" Composer="Amelie Lens" Mix="" Remixer=""/>
     <TRACK TrackID="5" Name="Rolling" Artist="Someone &amp; Other" Genre="Tech House"
            AverageBpm="125.50" Tonality="Cm" Label="Hot Creations" Year="2023"
            Rating="204" PlayCount="9" DateAdded="2023-06-11" Mix="" Remixer=""/>

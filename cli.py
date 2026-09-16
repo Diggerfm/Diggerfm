@@ -46,7 +46,26 @@ def cmd_profile(args):
     for l in prof["label"][:12]:
         if l["bucket"]:
             print("  %-34s %4d morceaux %6s lectures" % (l["bucket"][:34], l["n"], l["plays"]))
-    print("\nBPM (sur ce qu'il a reellement joue)")
+    rep = rekordbox.colour_report(conn)
+    if rep["coloured"]:
+        print()
+        print("couleurs, %d morceaux sur %d en portent une"
+              % (rep["coloured"], rep["total"]))
+        print("  Rekordbox n'attache aucun sens aux couleurs, c'est toi qui")
+        print("  le donnes. Dis-moi ce que chacune veut dire et elle devient")
+        print("  un role de set, comme une playlist nommee 'peak time'.")
+        for c in rep["colours"]:
+            print("  %-12s %5d morceaux  %6s lectures  BPM moyen %-7s note %s"
+                  % (c["colour"], c["n"], c["plays"], c["bpm"], c["rating"]))
+
+    vocab = rekordbox.cue_vocabulary(conn)
+    if vocab:
+        print()
+        print("mots qu'il emploie pour nommer ses points de repere")
+        print("  " + ", ".join("%s (%d)" % (w, n) for w, n in vocab[:14]))
+
+    print()
+    print("BPM (sur ce qu'il a reellement joue)")
     for b in prof["bpm_histogram"]:
         bar = "#" * min(40, int((b["plays"] or 0) / 2) + 1)
         print("  %3d  %s %s" % (b["bucket"], bar, b["plays"]))

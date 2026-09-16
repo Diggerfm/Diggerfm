@@ -52,19 +52,39 @@ def label_rarity(conn):
     return {k: v / top for k, v in rarity.items()}
 
 
+RECENCY_HALF_LIFE_DAYS = 540   # about eighteen months
+
+
 def profile_vectors(conn):
-    """Artists and labels he plays, weighted by play count."""
+    """Artists and labels he plays, weighted by play count and by recency.
+
+    Play count alone mistakes history for taste. Forty plays last touched in
+    2019 was a weapon once; ten plays last month is what he plays now. The
+    XML carries LastPlayed for exactly this and the first parser ignored it,
+    so each track's weight decays on a half-life: full weight if played
+    recently, half after eighteen months, never zero because an old favourite
+    is still evidence.
+    """
     artists, labels = {}, {}
+    decay = """
+        CASE WHEN last_played IS NULL OR last_played = '' THEN 0.5
+             ELSE MAX(0.25, POWER(0.5,
+                  (JULIANDAY('now') - JULIANDAY(SUBSTR(last_played, 1, 10)))
+                  / %d.0))
+        END
+    """ % RECENCY_HALF_LIFE_DAYS
     for r in conn.execute("""
-        SELECT LOWER(artist) a, SUM(play_count) p, COUNT(*) n
+        SELECT LOWER(artist) a,
+               SUM((COALESCE(play_count, 0) + 1) * (%s)) w
         FROM profile_tracks GROUP BY LOWER(artist)
-    """):
-        artists[r["a"]] = (r["p"] or 0) + r["n"]
+    """ % decay):
+        artists[r["a"]] = r["w"] or 0
     for r in conn.execute("""
-        SELECT LOWER(label) l, SUM(play_count) p, COUNT(*) n
+        SELECT LOWER(label) l,
+               SUM((COALESCE(play_count, 0) + 1) * (%s)) w
         FROM profile_tracks WHERE label IS NOT NULL GROUP BY LOWER(label)
-    """):
-        labels[r["l"]] = (r["p"] or 0) + r["n"]
+    """ % decay):
+        labels[r["l"]] = r["w"] or 0
     return artists, labels
 
 

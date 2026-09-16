@@ -62,6 +62,26 @@ def _local_path(location):
     return raw.replace("/", os.sep) or None
 
 
+def _cue_names(track_node):
+    """Named hot cues and memory cues, in order of position.
+
+    POSITION_MARK carries Name, Type (0 cue, 1 fade-in, 2 fade-out, 3 load,
+    4 loop), Start, End and Num (-1 is a memory cue, 0+ are hot cues A, B,
+    C...). Only the named ones are kept: an unnamed cue says where, a named
+    one says what.
+    """
+    out = []
+    for mark in track_node.findall("POSITION_MARK"):
+        name = (mark.get("Name") or "").strip()
+        if not name:
+            continue
+        out.append({"name": name,
+                    "start": _num(mark.get("Start")),
+                    "num": _num(mark.get("Num"), int)})
+    out.sort(key=lambda c: c["start"] if c["start"] is not None else 0)
+    return out
+
+
 def parse(xml_path):
     """Yield one dict per track in the COLLECTION node."""
     tree = ET.parse(xml_path)
@@ -92,6 +112,28 @@ def parse(xml_path):
             "date_added": a.get("DateAdded"),
             "comments": (a.get("Comments") or "").strip() or None,
             "location": _local_path(a.get("Location")),
+            # Five fields the official XML spec documents and the first
+            # version of this parser ignored.
+            #
+            # colour        DJs colour-code crates by energy or by moment in
+            #               the night. What each colour MEANS is personal, so
+            #               it is extracted and never interpreted here.
+            # last_played   play_count alone says a record was a weapon once.
+            #               Forty plays last touched in 2019 is a different
+            #               record from forty plays last month.
+            # composer      the spec reads "Name of composer (or producer)",
+            #               which is the credit Discogs could not give us on
+            #               digital-only releases.
+            # grouping      a free text field DJs use for their own tagging.
+            # duration      long records behave differently in a set.
+            "colour": (a.get("Colour") or "").strip() or None,
+            "last_played": (a.get("LastPlayed") or "").strip() or None,
+            "composer": (a.get("Composer") or "").strip() or None,
+            "grouping": (a.get("Grouping") or "").strip() or None,
+            "duration": _num(a.get("TotalTime")),
+            # Cue names are his own annotations: a hot cue called "drop" or
+            # "break" marks structure he found worth marking.
+            "cues": _cue_names(node),
         }
 
 
@@ -113,27 +155,39 @@ def merge_versions(rows):
         cur["play_count"] = (cur["play_count"] or 0) + (r["play_count"] or 0)
         cur["rating"] = max(cur["rating"] or 0, r["rating"] or 0)
         for field in ("bpm", "music_key", "genre", "label", "year",
-                      "comments", "location"):
+                      "comments", "location", "colour", "composer",
+                      "grouping", "duration"):
             if not cur.get(field) and r.get(field):
                 cur[field] = r[field]
         if r.get("date_added") and (not cur.get("date_added")
                                     or r["date_added"] < cur["date_added"]):
             cur["date_added"] = r["date_added"]
+        # The other way round for last_played: the most recent one wins.
+        if r.get("last_played") and (not cur.get("last_played")
+                                     or r["last_played"] > cur["last_played"]):
+            cur["last_played"] = r["last_played"]
+        if r.get("cues") and len(r["cues"]) > len(cur.get("cues") or []):
+            cur["cues"] = r["cues"]
     return list(merged.values())
 
 
 def load_into(conn, xml_path):
     """Import the collection. Returns a summary dict."""
+    import json as _json
+
     parsed = list(parse(xml_path))
     rows = merge_versions(parsed)
+    for r in rows:
+        r["cues"] = _json.dumps(r.get("cues") or [], ensure_ascii=False) or None
     sql = """
         INSERT OR REPLACE INTO profile_tracks
           (track_key, work_key, artist, title, version, bpm, music_key,
            genre, label, year, rating, play_count, date_added, comments,
-           location)
+           location, colour, last_played, composer, grouping, duration, cues)
         VALUES (:track_key, :work_key, :artist, :title, :version, :bpm,
                 :music_key, :genre, :label, :year, :rating, :play_count,
-                :date_added, :comments, :location)
+                :date_added, :comments, :location, :colour, :last_played,
+                :composer, :grouping, :duration, :cues)
     """
     with conn:
         conn.executemany(sql, rows)
@@ -148,6 +202,49 @@ def load_into(conn, xml_path):
         "with_key": sum(1 for r in rows if r["music_key"]),
         "rated": sum(1 for r in rows if r["rating"]),
     }
+
+
+def colour_report(conn):
+    """What his colour coding covers, without saying what it means.
+
+    Rekordbox lets a DJ tag tracks with eight colours and the software
+    attaches no meaning to them: red is peak time for one DJ and do-not-play
+    for another. Guessing would poison the profile the same way guessing a
+    playlist role would, so this counts and orders them and leaves the
+    reading to him. Once he says what a colour means, put it in config.toml
+    under [colours] and it becomes a set function like any other.
+    """
+    rows = conn.execute("""
+        SELECT colour, COUNT(*) n, SUM(play_count) plays,
+               ROUND(AVG(bpm), 1) bpm, ROUND(AVG(rating), 1) rating
+        FROM profile_tracks WHERE colour IS NOT NULL AND colour != ''
+        GROUP BY colour ORDER BY n DESC
+    """).fetchall()
+    total = conn.execute("SELECT COUNT(*) n FROM profile_tracks").fetchone()["n"]
+    return {"total": total, "coloured": sum(r["n"] for r in rows),
+            "colours": [dict(r) for r in rows]}
+
+
+def cue_vocabulary(conn, limit=25):
+    """The words he uses to name his cue points.
+
+    A DJ who names a hot cue "break" or "drop" has annotated the structure
+    of that record by hand. The vocabulary is his, so it is reported rather
+    than matched against a fixed list.
+    """
+    import collections
+    import json as _json
+
+    counter = collections.Counter()
+    for r in conn.execute("SELECT cues FROM profile_tracks WHERE cues IS NOT NULL"):
+        try:
+            for c in _json.loads(r["cues"]) or []:
+                name = (c.get("name") or "").strip().lower()
+                if name:
+                    counter[name] += 1
+        except Exception:
+            continue
+    return counter.most_common(limit)
 
 
 def profile_summary(conn, min_plays=1):

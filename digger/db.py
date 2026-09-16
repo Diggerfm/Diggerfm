@@ -154,6 +154,14 @@ def _migrate(conn):
         conn.execute("ALTER TABLE profile_tracks ADD COLUMN functions TEXT")
     if "playlists" not in prof:
         conn.execute("ALTER TABLE profile_tracks ADD COLUMN playlists TEXT")
+    # Documented in Pioneer's own XML spec and missed by the first parser:
+    # his colour coding, when he last played a record, the producer credit,
+    # his free-text grouping, the duration, and the cues he named himself.
+    for col, decl in (("colour", "TEXT"), ("last_played", "TEXT"),
+                      ("composer", "TEXT"), ("grouping", "TEXT"),
+                      ("duration", "REAL"), ("cues", "TEXT")):
+        if col not in prof:
+            conn.execute("ALTER TABLE profile_tracks ADD COLUMN %s %s" % (col, decl))
     conn.commit()
 
 
