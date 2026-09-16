@@ -12,7 +12,8 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
 
 from digger import db, score
 from digger.profile import rekordbox
@@ -135,6 +136,67 @@ def cmd_collect(args):
         print("bandcamp: %d pistes, %d nouvelles" % (len(rows), n))
         total += n
     print("total nouveau: %d" % total)
+
+
+def cmd_discover(args):
+    """Read this week's sets from the 1001Tracklists index and locate them.
+
+    Only the index is read from their site: one request. Their set pages
+    serve a Cloudflare challenge after about three, which this does not try
+    to get around. The recording is then found on the platform hosting it,
+    and a candidate that cannot prove it is the right episode is refused.
+    """
+    import os
+    from digger.sources import tracklists
+    from digger.sources.setfinder import find_recording
+
+    ytdlp = os.path.join(ROOT, ".venv", "Scripts", "yt-dlp.exe")
+    if not os.path.exists(ytdlp):
+        ytdlp = "yt-dlp"
+
+    sets_path = os.path.join(ROOT, "sets.txt")
+    known = set()
+    if os.path.exists(sets_path):
+        with open(sets_path, encoding="utf-8") as fh:
+            known = {l.strip() for l in fh if l.strip() and not l.startswith("#")}
+
+    try:
+        index = tracklists.fetch_index()
+    except tracklists.Blocked as exc:
+        print("1001Tracklists nous demande de nous arreter: %s" % exc)
+        print("Rien n'a ete force. Reessaie plus tard.")
+        return
+
+    wanted = [s for s in index if s["has_media"]][:args.limit]
+    print("index: %d sets, %d avec un enregistrement, %d examines"
+          % (len(index), sum(1 for s in index if s["has_media"]), len(wanted)))
+    print()
+
+    found, refused = [], 0
+    for s in wanted:
+        hit = find_recording(s["title"], ytdlp)
+        short = s["title"][:46]
+        if not hit:
+            refused += 1
+            print("  refuse  %-46s aucun candidat ne prouve l'edition" % short)
+            continue
+        if hit["url"] in known:
+            print("  connu   %-46s" % short)
+            continue
+        found.append((s, hit))
+        print("  trouve  %-46s %d min" % (short, int(hit["duration"] // 60)))
+        print("          %s" % hit["url"])
+
+    print()
+    print("%d nouveaux, %d refuses faute de preuve d'edition" % (len(found), refused))
+    if found and not args.dry:
+        with open(sets_path, "a", encoding="utf-8") as fh:
+            for s, hit in found:
+                fh.write("\n# %s (%s)\n%s\n"
+                         % (s["title"], s.get("date") or "", hit["url"]))
+        print("ajoutes a sets.txt. Lance ensuite: python cli.py fingerprint --file sets.txt")
+    elif found:
+        print("--dry: rien n'a ete ecrit.")
 
 
 def cmd_fingerprint(args):
@@ -325,6 +387,12 @@ def main():
     sc.add_argument("--genre", default="electronic")
     sc.add_argument("-v", "--verbose", action="store_true")
     sc.set_defaults(func=cmd_collect)
+
+    sd2 = sub.add_parser("discover",
+                         help="relever les sets de la semaine et les localiser")
+    sd2.add_argument("--limit", type=int, default=12)
+    sd2.add_argument("--dry", action="store_true")
+    sd2.set_defaults(func=cmd_discover)
 
     sf = sub.add_parser("fingerprint", help="identifier les morceaux d'un set")
     sf.add_argument("url", nargs="*")

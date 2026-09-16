@@ -94,7 +94,42 @@ def main():
         return "%d pistes, %d nouvelles" % (len(rows), db.upsert_sightings(conn, rows))
     stage("bandcamp", bc, results)
 
-    # 4. Sets to fingerprint
+    # 4. This week's sets, found before they are fingerprinted.
+    #    Only the 1001Tracklists index is read, one request: their set pages
+    #    serve a Cloudflare challenge after about three and this does not
+    #    try to get around one. The recording is then located on the
+    #    platform hosting it, and a candidate that cannot prove it is the
+    #    right episode is refused rather than guessed.
+    def discover():
+        from digger.sources import tracklists
+        from digger.sources.setfinder import find_recording
+        ytdlp = os.path.join(ROOT, ".venv", "Scripts", "yt-dlp.exe")
+        if not os.path.exists(ytdlp):
+            ytdlp = "yt-dlp"
+        known = set(read_sets())
+        try:
+            index = tracklists.fetch_index()
+        except tracklists.Blocked as exc:
+            return "1001Tracklists nous a arretes: %s" % exc
+        added = refused = 0
+        lines = []
+        for s in [x for x in index if x["has_media"]][:15]:
+            hit = find_recording(s["title"], ytdlp)
+            if not hit:
+                refused += 1
+                continue
+            if hit["url"] in known:
+                continue
+            lines.append("\n# %s (%s)\n%s\n"
+                         % (s["title"], s.get("date") or "", hit["url"]))
+            added += 1
+        if lines:
+            with open(SETS_FILE, "a", encoding="utf-8") as fh:
+                fh.writelines(lines)
+        return "%d sets ajoutes, %d refuses faute de preuve d'edition" % (added, refused)
+    stage("sets de la semaine", discover, results)
+
+    # 5. Sets to fingerprint
     def sets():
         urls = read_sets()
         if not urls:
@@ -115,7 +150,7 @@ def main():
         return "%d nouveaux sets sur %d" % (done, len(urls))
     stage("fingerprint sets", sets, results)
 
-    # 5. Resolve what the sets turned up against the catalogue.
+    # 6. Resolve what the sets turned up against the catalogue.
     #    Fingerprinting yields an artist and a title; Beatport's ?isrc=
     #    filter turns that into BPM, key, label, a preview and a buy link,
     #    so the records he was actually played become usable.
@@ -129,7 +164,7 @@ def main():
             r["looked_up"], r["found"], r["missed"])
     stage("enrichissement des sets", enrich, results)
 
-    # 6. Timbre on whatever is new
+    # 7. Timbre on whatever is new
     def feats():
         # 300 was a permanent backlog, not a cap: a week brings roughly 1500
         # new tracks from 120 charts, so the queue only ever grew. At about
@@ -140,7 +175,7 @@ def main():
         return "%d analyses, %d echecs" % (r["analyzed"], r["failed"])
     stage("analyse audio", feats, results)
 
-    # 7. The digest itself
+    # 8. The digest itself
     def digest():
         from digger import feedback as fb
         artists, labels_v = score.profile_vectors(conn)
