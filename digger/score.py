@@ -218,7 +218,26 @@ def score_all(conn, since_days=14):
     return scored
 
 
-def assign_slots(scored, quota=None):
+# A candidate has to clear this to be worth his time. Below it the slot is
+# left short rather than filled.
+#
+# MusicMate answers a prompt very close to his brief with twenty tracks
+# whose own relevance column reads 75, 75, 75, 75, 75, 75, then 18, 16, 15,
+# 14, 12, 11, 9, 9, 9, 8, 8, 4, 4, 2. Six matches, fourteen of padding, and
+# their interface colours the padding red. The promise of "20 tracks" beat
+# the truth of six.
+#
+# Six right records beat twenty where fourteen are filler, because filler
+# costs him the one thing the tool is meant to save: the time to listen.
+SLOT_FLOOR = {
+    "bullseye": 0.35,      # squarely his sound, or not his sound
+    "modernisation": 0.20,
+    "bridge": 0.12,        # deliberately loose: a bridge is not meant to be him
+    "wildcard": 0.0,       # a gamble has no floor by definition
+}
+
+
+def assign_slots(scored, quota=None, floors=None):
     """Fill the imposed quota rather than taking the top N.
 
     bullseye takes the highest affinity, modernisation the corroborated ones
@@ -226,6 +245,7 @@ def assign_slots(scored, quota=None):
     wildcard is drawn from the tail so the list cannot become a monoculture.
     """
     quota = quota or SLOT_QUOTA
+    floors = SLOT_FLOOR if floors is None else floors
     pool = list(scored)
     out = []
 
@@ -240,22 +260,41 @@ def assign_slots(scored, quota=None):
         return picked
 
     for slot, n in quota:
+        floor = floors.get(slot, 0.0)
+        # The floor is what keeps a quota from becoming a promise the data
+        # cannot keep. A slot that cannot be filled above it stays short.
+        clears = (lambda c, f=floor: (c.get("score") or 0) >= f
+                  or (c.get("affinity") or 0) >= f)
+
         if slot == "bullseye":
-            got = take(n, lambda c: -c["affinity"], lambda c: c["affinity"] >= 0.35)
+            got = take(n, lambda c: -c["affinity"],
+                       lambda c: (c.get("affinity") or 0) >= floor)
         elif slot == "modernisation":
-            got = take(n, lambda c: -c["score"], lambda c: c["n_sources"] >= 1)
+            got = take(n, lambda c: -c["score"],
+                       lambda c: c["n_sources"] >= 1 and clears(c))
         elif slot == "bridge":
-            got = take(n, lambda c: (-c["corroboration"], c["affinity"]))
+            got = take(n, lambda c: (-c["corroboration"], c["affinity"]), clears)
         else:
             mid = pool[len(pool) // 3:] if len(pool) > 6 else pool
-            got = mid[:n]
+            got = [c for c in mid if clears(c)][:n]
             for c in got:
                 pool.remove(c)
         for rank, c in enumerate(got, 1):
             c["slot"] = slot
             c["rank"] = rank
+            c["slot_target"] = n
             out.append(c)
     return out
+
+
+def slot_shortfall(slots, quota=None):
+    """Which slots came up short, so the page can say so instead of padding."""
+    quota = quota or SLOT_QUOTA
+    got = {}
+    for s in slots:
+        got[s["slot"]] = got.get(s["slot"], 0) + 1
+    return [{"slot": name, "got": got.get(name, 0), "target": n}
+            for name, n in quota if got.get(name, 0) < n]
 
 
 def explain(cand, artists, labels, timbre=None, feats=None):

@@ -608,6 +608,22 @@ a{color:var(--near)}
     }
     h += "</div>";
 
+    if((D.shortfall || []).length){
+      // Said out loud. A quota is a shape, not a promise: filling it with
+      // records that did not clear the bar would cost him the only thing
+      // this is meant to save, which is the time to listen.
+      var miss = D.shortfall.map(function(s){
+        return (SLOTS[s.slot] ? SLOTS[s.slot].label : s.slot) +
+               " " + s.got + "/" + s.target;
+      }).join(", ");
+      h += '<div class="banner" style="border-color:var(--near); ' +
+        'background:var(--near-soft)"><b>Cette semaine le vivier ne remplit ' +
+        "pas toutes les cases : " + esc(miss) + ".</b> Rien n'a ete ajoute " +
+        "pour completer. Six morceaux justes valent mieux que vingt dont " +
+        "quatorze de remplissage, parce que le remplissage coute la seule " +
+        "chose que cet outil doit t'economiser : le temps d'ecoute.</div>";
+    }
+
     var order = ["bullseye","modernisation","bridge","wildcard"];
     order.forEach(function(slot){
       var items = D.digest.filter(function(t){ return t.slot === slot; });

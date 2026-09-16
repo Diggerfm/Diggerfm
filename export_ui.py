@@ -170,6 +170,7 @@ def build_digest(conn, limit_audio=10):
     cand_feats = score.load_candidate_features(conn)
     scored = score.score_all(conn, since_days=14)
     slots = score.assign_slots(scored)
+    shortfall = score.slot_shortfall(slots)
 
     out = []
     for s in slots:
@@ -204,6 +205,18 @@ def build_digest(conn, limit_audio=10):
             "stream": m.get("stream_url"),
         })
     return out
+
+
+def build_shortfall(conn):
+    """Slots the data could not fill above their floor.
+
+    Reported rather than padded. A competitor answering a near-identical
+    brief shipped twenty tracks whose own relevance column read 75 six
+    times and then 18, 16, 15 down to 2: six matches and fourteen of
+    filler, with the filler coloured red in their own interface.
+    """
+    slots = score.assign_slots(score.score_all(conn, since_days=14))
+    return score.slot_shortfall(slots)
 
 
 def build_stats(conn):
@@ -493,6 +506,7 @@ def main():
     fresh = build_fresh(conn)
     print("analyse...")
     stats = build_stats(conn)
+    shortfall = build_shortfall(conn)
 
     print("audio du digest...")
     n1 = attach_audio(digest, 20)
@@ -514,6 +528,7 @@ def main():
         "trends": trends,
         "fresh": fresh,
         "stats": stats,
+        "shortfall": shortfall,
         "profile": ({"tracks": timbre["n"]} if timbre else None),
         "weights": score.TIMBRE_WEIGHTS,
         "counts": {

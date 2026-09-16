@@ -145,3 +145,40 @@ if FAIL:
     sys.exit(1)
 print("rejets: all checks passed (aime=%.2f, ressemble aux rejets=%.2f)"
       % (a_good, a_bad))
+
+
+# --- a quota must never become a promise the data cannot keep
+def cand(key, aff, corr, sources=1):
+    return {"work_key": key, "artist": key, "title": key,
+            "affinity": aff, "corroboration": corr,
+            "score": 0.6 * aff + 0.4 * corr,
+            "n_sources": sources, "n_charts": 0, "n_sets": 0}
+
+# Six good ones and a long tail of near-zero, the shape MusicMate showed:
+# six matches at the top, then a collapse to relevance 2.
+pool = [cand("good%d" % i, 0.8, 0.9) for i in range(6)]
+pool += [cand("weak%d" % i, 0.01, 0.02) for i in range(40)]
+filled = score.assign_slots(pool)
+check("padding refused", len(filled) <= 8, True)
+check("the good ones are kept", len([x for x in filled if x["artist"].startswith("good")]), 6)
+check("the tail is not shipped",
+      [x for x in filled if x["artist"].startswith("weak") and x["slot"] != "wildcard"], [])
+
+short = score.slot_shortfall(filled)
+check("shortfall is reported", len(short) > 0, True)
+check("shortfall names the slot and the gap",
+      all(s["got"] < s["target"] for s in short), True)
+
+# A full pool still fills the whole quota.
+rich = [cand("ok%d" % i, 0.7, 0.8) for i in range(40)]
+full = score.assign_slots(rich)
+check("a real pool fills the quota", len(full), 20)
+check("nothing short when the pool is rich", score.slot_shortfall(full), [])
+
+if FAIL:
+    print("FAILED %d" % len(FAIL))
+    for f in FAIL:
+        print("  " + f)
+    sys.exit(1)
+print("quota: all checks passed (pool maigre -> %d proposes, pool riche -> %d)"
+      % (len(filled), len(full)))
